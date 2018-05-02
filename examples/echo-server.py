@@ -1,6 +1,5 @@
 import asyncio
 import json
-import signal
 
 from callosum import Peer
 
@@ -24,13 +23,11 @@ async def serve():
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, loop.stop)
-    loop.add_signal_handler(signal.SIGTERM, loop.stop)
     try:
         task = loop.create_task(serve())
         print('listening...')
         loop.run_forever()
-        # continued here if interrupted
+    except (KeyboardInterrupt, SystemExit):
         print('closing...')
         task.cancel()
         loop.run_until_complete(task)

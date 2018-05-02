@@ -102,3 +102,6 @@ ENV/
 
 # editor/IDE
 .*.swp
+
+# PyTest stuff:
+.pytest_cache/
