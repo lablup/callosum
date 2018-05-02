@@ -28,9 +28,12 @@ if __name__ == '__main__':
     loop.add_signal_handler(signal.SIGTERM, loop.stop)
     try:
         task = loop.create_task(serve())
+        print('listening...')
         loop.run_forever()
         # continued here if interrupted
+        print('closing...')
         task.cancel()
         loop.run_until_complete(task)
     finally:
         loop.close()
+        print('closed.')

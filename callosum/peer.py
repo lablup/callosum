@@ -170,13 +170,13 @@ class Peer:
                 response.to_zmsg(self._serializer))
 
     async def close(self):
-        if self._scheduler:
+        if self._scheduler is not None:
             await self._scheduler.close()
-        if self._server_sock:
+        if self._server_sock is not None:
             self._server_sock.close()
-        if self._client_sock:
+        if self._client_sock is not None:
             self._client_sock.close()
-        if self._zctx:
+        if self._zctx is not None:
             self._zctx.term()
 
     async def invoke(self, func_id, body, *, order_key=None, invoke_timeout=None):
