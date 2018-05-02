@@ -14,7 +14,7 @@ Features
 * Intrinsic support for error propagation
 * Supports large-size data streaming via automatic chunking
 
-Installaion
------------
+Installation
+------------
 
 TODO
