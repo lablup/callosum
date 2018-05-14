@@ -8,7 +8,8 @@ from callosum import Peer
 async def call():
     peer = Peer(connect='tcp://localhost:5000',
                 serializer=json.dumps,
-                deserializer=json.loads)
+                deserializer=json.loads,
+                invoke_timeout=2.0)
     response = await peer.invoke('echo', {
         'sent': secrets.token_hex(16),
     })

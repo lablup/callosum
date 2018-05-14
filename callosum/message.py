@@ -191,9 +191,13 @@ class Message:
             'zip': compress,
         }
         header = mpackb(header)
+        if self.msgtype == MessageTypes.FUNCTION:
+            body = serializer(self.body)
+        else:
+            body = self.body
         data = {
             'meta': metadata,
-            'body': serializer(self.body),
+            'body': body,
         }
         data = mpackb(data)
         if compress:

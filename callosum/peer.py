@@ -37,7 +37,6 @@ class Peer:
                  max_body_size=10 * (2**20),  # 10 MiBytes
                  max_concurrency=100,
                  connect_timeout=10.0,
-                 order_key_timeout=60.0,
                  invoke_timeout=30.0):
 
         if connect is None and bind is None:
@@ -49,7 +48,6 @@ class Peer:
         self._deserializer = _wrap_deserializer(deserializer)
         self._max_concurrency = max_concurrency
         self._connect_timeout = connect_timeout
-        self._order_key_timeout = order_key_timeout
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
