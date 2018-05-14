@@ -1,24 +1,24 @@
+import asyncio
 import secrets
 
 import aiojobs
 from async_timeout import timeout
+import snappy
 import zmq, zmq.asyncio
 
 from .exceptions import ServerError, HandlerError
 from .message import Message, MessageTypes
 
 
-def _wrap_serializer(serializer, compress=False):
+def _wrap_serializer(serializer):
     def _serialize(value):
         if serializer is not None:
             value = serializer(value)
-        if isinstance(value, str):
-            return value.encode('utf8')
         return value
     return _serialize
 
 
-def _wrap_deserializer(deserializer, compress=False):
+def _wrap_deserializer(deserializer):
     def _deserialize(value):
         if deserializer is not None:
             value = deserializer(value)
@@ -45,8 +45,8 @@ class Peer:
         self._connect = connect
         self._bind = bind
         self._compress = compress
-        self._serializer = _wrap_serializer(serializer, compress)
-        self._deserializer = _wrap_deserializer(deserializer, compress)
+        self._serializer = _wrap_serializer(serializer)
+        self._deserializer = _wrap_deserializer(deserializer)
         self._max_concurrency = max_concurrency
         self._connect_timeout = connect_timeout
         self._order_key_timeout = order_key_timeout
@@ -92,22 +92,19 @@ class Peer:
             request = Message.from_zmsg(raw_msg, self._deserializer)
             try:
                 handler = self._lookup(request.msgtype, request.identifier)
-            except LookupError:
-                # TODO: reply error
-                continue
-            job = await self._scheduler.spawn(
-                handler(request.identifier, request.body))
-            result = await job.wait()
-            response = Message(
-                request.msgtype,
-                request.identifier,
-                request.client_order_key,
-                request.client_order,
-                None,
-                result,
-            )
+                job = await self._scheduler.spawn(
+                    handler(request.identifier, request.body))
+                # keep outstanding set of jobs identified by the request
+                # so that the client can cancel them.
+                result = await job.wait()
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                raise
+            except Exception as e:
+                response = Message.error(request, e)
+            else:
+                response = Message.result(request, result)
             await self._server_sock.send_multipart(
-                response.to_zmsg(self._serializer))
+                response.to_zmsg(self._serializer, self._compress))
 
     async def close(self):
         if self._scheduler is not None:
@@ -129,26 +126,35 @@ class Peer:
         if order_key is None:
             order_key = secrets.token_hex(8)
             order_val = 0
-        with timeout(invoke_timeout):
-            request = Message(
-                MessageTypes.FUNCTION,
-                func_id,
-                order_key,
-                order_val,
-                None,
-                body,
-            )
-            await self._client_sock.send_multipart(request.to_zmsg(self._serializer))
-            # TODO: implement per-key ordering
-            zmsg = await self._client_sock.recv_multipart()
-            response = Message.from_zmsg(zmsg, self._deserializer)
-            if response.msgtype == MessageTypes.FAILURE:
-                # TODO: encode/decode error info
-                raise HandlerError(response.body)
-            elif response.msgtype == MessageTypes.ERROR:
-                # TODO: encode/decode error info
-                raise ServerError(response.body)
-            return response.body
+        try:
+            with timeout(invoke_timeout):
+                request = Message(
+                    MessageTypes.FUNCTION,
+                    func_id,
+                    order_key,
+                    order_val,
+                    None,
+                    body,
+                )
+                await self._client_sock.send_multipart(
+                    request.to_zmsg(self._serializer, self._compress))
+                # TODO: implement per-key ordering
+                zmsg = await self._client_sock.recv_multipart()
+                response = Message.from_zmsg(zmsg, self._deserializer)
+                if response.msgtype == MessageTypes.RESULT:
+                    pass
+                elif response.msgtype == MessageTypes.FAILURE:
+                    # TODO: encode/decode error info
+                    raise HandlerError(response.body)
+                elif response.msgtype == MessageTypes.ERROR:
+                    # TODO: encode/decode error info
+                    raise ServerError(response.body)
+                return response.body
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            cancel_request = Message.cancel(request)
+            await self._client_sock.send_multipart(
+                cancel_request.to_zmsg(self._serializer))
+            raise
 
     async def send_stream(self, order_key, metadata, stream, *, reporthook=None):
         raise NotImplementedError
