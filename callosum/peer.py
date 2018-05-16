@@ -1,5 +1,6 @@
 import asyncio
 import io
+from typing import Callable
 import secrets
 
 import aiojobs
@@ -30,15 +31,15 @@ def _wrap_deserializer(deserializer):
 class Peer:
 
     def __init__(self, *,
-                 connect=None,
-                 bind=None,
-                 serializer=None,
-                 deserializer=None,
-                 compress=True,
-                 max_body_size=10 * (2**20),  # 10 MiBytes
-                 max_concurrency=100,
-                 connect_timeout=10.0,
-                 invoke_timeout=30.0):
+                 connect: str=None,
+                 bind: str=None,
+                 serializer: Callable=None,
+                 deserializer: Callable=None,
+                 compress: bool=True,
+                 max_body_size: int=10 * (2**20),  # 10 MiBytes
+                 max_concurrency: int=100,
+                 execute_timeout: float=None,
+                 invoke_timeout: float=None):
 
         if connect is None and bind is None:
             raise ValueError('You must specify either connect or bind.')
@@ -48,7 +49,7 @@ class Peer:
         self._serializer = _wrap_serializer(serializer)
         self._deserializer = _wrap_deserializer(deserializer)
         self._max_concurrency = max_concurrency
-        self._connect_timeout = connect_timeout
+        self._exec_timeout = execute_timeout
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
@@ -64,13 +65,13 @@ class Peer:
         self._func_registry[method] = handler
 
     def handle_stream(self, method, handler):
-        self._func_registry[method] = handler
+        self._stream_registry[method] = handler
 
     def unhandle_function(self, method):
         del self._func_registry[method]
 
     def unhandle_stream(self, method):
-        del self._func_registry[method]
+        del self._stream_registry[method]
 
     def _lookup(self, msgtype, method):
         if msgtype == MessageTypes.FUNCTION:

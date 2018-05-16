@@ -1,5 +1,39 @@
-lang: python
+language: python
+os:
+  - linux
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
+cache:
+  directories:
+    - $HOME/.cache/pip
 
-script:
- - python -m flake8
- - python -m pytest
+stages:
+  - name: test
+  - name: deploy
+    if: tag IS present
+
+# stage def.
+jobs:
+  include:
+
+    - stage: test
+      install:
+        - pip install -U -e ".[ci]"
+      script:
+        - python -m flake8
+        - python -m pytest
+      after_success:
+        - codecov
+
+    - stage: deploy
+      install: skip
+      script: skip
+      after_script: skip
+      deploy:
+        on:
+          tags: true
+        provider: script
+        script: ./scripts/ci/deploy.sh
+
+notifications:
+  email: false
