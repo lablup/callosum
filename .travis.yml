@@ -6,6 +6,10 @@ before_cache:
 cache:
   directories:
     - $HOME/.cache/pip
+addons:
+  apt:
+    packages:
+    - libsnappy-dev
 
 stages:
   - name: test
