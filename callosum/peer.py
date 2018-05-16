@@ -1,12 +1,13 @@
 import asyncio
+import io
 import secrets
 
 import aiojobs
 from async_timeout import timeout
-import snappy
 import zmq, zmq.asyncio
 
 from .exceptions import ServerError, HandlerError
+from .io import AsyncBytesIO
 from .message import Message, MessageTypes
 
 
@@ -57,23 +58,25 @@ class Peer:
         self._func_registry = {}
         self._stream_registry = {}
 
-    def handle_function(self, func_id, handler):
-        self._func_registry[func_id] = handler
+    # TODO: add handle_service??
 
-    def handle_stream(self, stream_id, handler):
-        self._func_registry[stream_id] = handler
+    def handle_function(self, method, handler):
+        self._func_registry[method] = handler
 
-    def unhandle_function(self, func_id):
-        del self._func_registry[func_id]
+    def handle_stream(self, method, handler):
+        self._func_registry[method] = handler
 
-    def unhandle_stream(self, stream_id):
-        del self._func_registry[stream_id]
+    def unhandle_function(self, method):
+        del self._func_registry[method]
 
-    def _lookup(self, msgtype, identifier):
+    def unhandle_stream(self, method):
+        del self._func_registry[method]
+
+    def _lookup(self, msgtype, method):
         if msgtype == MessageTypes.FUNCTION:
-            return self._func_registry[identifier]
+            return self._func_registry[method]
         elif msgtype == MessageTypes.STREAM:
-            return self._stream_registry[identifier]
+            return self._stream_registry[method]
         raise ValueError('Invalid msgtype')
 
     async def listen(self):
@@ -89,11 +92,12 @@ class Peer:
             raw_msg = await self._server_sock.recv_multipart()
             request = Message.from_zmsg(raw_msg, self._deserializer)
             try:
-                handler = self._lookup(request.msgtype, request.identifier)
+                handler = self._lookup(request.msgtype, request.method)
                 job = await self._scheduler.spawn(
-                    handler(request.identifier, request.body))
+                    handler(request))
                 # keep outstanding set of jobs identified by the request
                 # so that the client can cancel them.
+                # TODO: implement per-key ordering
                 result = await job.wait()
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 raise
@@ -114,7 +118,7 @@ class Peer:
         if self._zctx is not None:
             self._zctx.term()
 
-    async def invoke(self, func_id, body, *, order_key=None, invoke_timeout=None):
+    async def invoke(self, method, body, *, order_key=None, invoke_timeout=None):
         if self._client_sock is None:
             self._client_sock = self._zctx.socket(zmq.PAIR)
             self._client_sock.setsockopt(zmq.LINGER, 100)
@@ -123,31 +127,59 @@ class Peer:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
             order_key = secrets.token_hex(8)
-            order_val = 0
+            seq_id = 0
         try:
+            request = None
             with timeout(invoke_timeout):
-                request = Message(
-                    MessageTypes.FUNCTION,
-                    func_id,
-                    order_key,
-                    order_val,
-                    None,
-                    body,
-                )
-                await self._client_sock.send_multipart(
-                    request.to_zmsg(self._serializer, self._compress))
-                # TODO: implement per-key ordering
-                zmsg = await self._client_sock.recv_multipart()
-                response = Message.from_zmsg(zmsg, self._deserializer)
-                if response.msgtype == MessageTypes.RESULT:
-                    pass
-                elif response.msgtype == MessageTypes.FAILURE:
-                    # TODO: encode/decode error info
-                    raise HandlerError(response.body)
-                elif response.msgtype == MessageTypes.ERROR:
-                    # TODO: encode/decode error info
-                    raise ServerError(response.body)
-                return response.body
+                if callable(body):
+                    reader = AsyncBytesIO()
+                    writer = AsyncBytesIO()
+
+                    def identity(val):
+                        return val
+
+                    async def send_hook():
+                        nonlocal request, response
+                        request = Message(
+                            MessageTypes.FUNCTION,
+                            method,
+                            order_key,
+                            seq_id,
+                            None,
+                            writer.getvalue(),
+                        )
+                        await self._client_sock.send_multipart(
+                            request.to_zmsg(identity, self._compress))
+                        zmsg = await self._client_sock.recv_multipart()
+                        response = Message.from_zmsg(zmsg, identity)
+                        # TODO: handle "outer" protocol errors
+                        reader.write(response.body)
+                        reader.seek(0, io.SEEK_SET)
+
+                    return await body(reader, writer, send_hook)
+                    # TODO: how to handle "inner" protocol errors?
+                else:
+                    request = Message(
+                        MessageTypes.FUNCTION,
+                        method,
+                        order_key,
+                        seq_id,
+                        None,
+                        body,
+                    )
+                    await self._client_sock.send_multipart(
+                        request.to_zmsg(self._serializer, self._compress))
+                    zmsg = await self._client_sock.recv_multipart()
+                    response = Message.from_zmsg(zmsg, self._deserializer)
+                    if response.msgtype == MessageTypes.RESULT:
+                        pass
+                    elif response.msgtype == MessageTypes.FAILURE:
+                        # TODO: encode/decode error info
+                        raise HandlerError(response.body)
+                    elif response.msgtype == MessageTypes.ERROR:
+                        # TODO: encode/decode error info
+                        raise ServerError(response.body)
+                    return response.body
         except (asyncio.TimeoutError, asyncio.CancelledError):
             cancel_request = Message.cancel(request)
             await self._client_sock.send_multipart(

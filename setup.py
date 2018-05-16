@@ -46,6 +46,10 @@ docs_requires = [
     'sphinx-autodoc-typehints',
 ]
 
+thrift_requires = [
+    'aiothrift',
+]
+
 
 setup(
     name='callosum',
@@ -73,9 +77,10 @@ setup(
         'Topic :: Communications',
         'Topic :: Internet',
     ],
-
-    packages=['callosum'],
-
+    packages=[
+        'callosum',
+        'callosum.rpc',
+    ],
     python_requires='>=3.6',
     setup_requires=['setuptools>=38.6.0'],
     install_requires=install_requires,
@@ -85,5 +90,6 @@ setup(
         'dev': dev_requires,
         'ci': ci_requires,
         'docs': docs_requires,
+        'thrift': thrift_requires,
     },
 )

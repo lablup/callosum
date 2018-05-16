@@ -4,9 +4,15 @@ import json
 from callosum import Peer
 
 
-async def handle_echo(func_id, msg):
+async def handle_echo(request):
     return {
-        'received': msg['sent'],
+        'received': request.body['sent'],
+    }
+
+
+async def handle_add(request):
+    return {
+        'result': request.body['a'] + request.body['b'],
     }
 
 
@@ -15,6 +21,7 @@ async def serve():
                 serializer=json.dumps,
                 deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
+    peer.handle_function('add', handle_add)
     try:
         await peer.listen()
     except asyncio.CancelledError:

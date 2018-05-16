@@ -1,0 +1,5 @@
+lang: python
+
+script:
+ - python -m flake8
+ - python -m pytest

@@ -110,12 +110,12 @@ metadata_types = (
 class Message:
 
     __slots__ = (
-        'msgtype', 'identifier',
+        'msgtype', 'method',
         'order_key', 'seq_id',
         'metadata', 'body')
 
     msgtype: MessageTypes
-    identifier: str        # function/stream ID
+    method: str        # function/stream ID
     order_key: str  # replied back as-is
     seq_id: int      # replied back as-is
     metadata: Optional[StreamMetadata]
@@ -125,7 +125,7 @@ class Message:
     def result(cls, request, result_body):
         return cls(
             MessageTypes.RESULT,
-            request.identifier, request.order_key, request.seq_id,
+            request.method, request.order_key, request.seq_id,
             ResultMetadata(True),
             result_body,
         )
@@ -134,7 +134,7 @@ class Message:
     def failure(cls, request, exc):
         return cls(
             MessageTypes.FAILURE,
-            request.identifier, request.order_key, request.seq_id,
+            request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
             mpackb(tuple(map(str, exc.args))),
         )
@@ -143,7 +143,7 @@ class Message:
     def error(cls, request, exc):
         return cls(
             MessageTypes.ERROR,
-            request.identifier, request.order_key, request.seq_id,
+            request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),
             mpackb(tuple(map(str, exc.args))),
         )
@@ -152,7 +152,7 @@ class Message:
     def cancel(cls, request):
         return cls(
             MessageTypes.CANCEL,
-            request.identifier, request.order_key, request.seq_id,
+            request.method, request.order_key, request.seq_id,
             NullMetadata(), b'',
         )
 
@@ -160,7 +160,7 @@ class Message:
     def from_zmsg(cls, zmsg, deserializer):
         header = munpackb(zmsg[0])
         assert isinstance(header['type'], int)
-        assert isinstance(header['id'], str)
+        assert isinstance(header['meth'], str)
         assert isinstance(header['okey'], str)
         assert isinstance(header['seq'], int)
         assert isinstance(header['zip'], bool)
@@ -173,7 +173,7 @@ class Message:
         assert isinstance(data['meta'], bytes)
         metadata = metadata_types[msgtype].from_bytes(data['meta'])
         return cls(msgtype,
-                   header['id'],
+                   header['meth'],
                    header['okey'],
                    header['seq'],
                    metadata,
@@ -185,13 +185,13 @@ class Message:
             metadata = self.metadata.to_bytes()
         header = {
             'type': int(self.msgtype),
-            'id': self.identifier,
+            'meth': self.method,
             'okey': self.order_key,
             'seq': self.seq_id,
             'zip': compress,
         }
         header = mpackb(header)
-        if self.msgtype == MessageTypes.FUNCTION:
+        if self.msgtype in (MessageTypes.FUNCTION, MessageTypes.RESULT):
             body = serializer(self.body)
         else:
             body = self.body
