@@ -1,9 +1,14 @@
 Callosum
 ========
 
-Asynchronous multi-channel order-preserving RPC and data streaming library
+An RPC Transport Library
 
-*Corpus callosum* is a bundle of neuron fibers that connects two hemispheres of a human brain.
+It provides an asynchronous multi-channel order-preserving message and data
+streaming transport for *upper* RPC layers (e.g., Apache Thrift) by wrapping
+*lower* transport implementations (e.g., ZeroMQ).
+
+*Corpus callosum* is a bundle of neuron fibers that connects two cerebral
+hemispheres of a human brain.
 
 Features
 --------
@@ -13,6 +18,7 @@ Features
 * Persistent multiple messaging channels where each channel is order-preserved
 * Intrinsic support for error propagation
 * Supports large-size data streaming via automatic chunking
+* Replacible lower/upper layers
 
 Installation
 ------------

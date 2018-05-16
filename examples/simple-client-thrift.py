@@ -4,7 +4,7 @@ import random
 import secrets
 
 from callosum import Peer
-from callosum.rpc.thrift import ThriftClientAdaptor
+from callosum.upper.thrift import ThriftClientAdaptor
 import thriftpy
 
 

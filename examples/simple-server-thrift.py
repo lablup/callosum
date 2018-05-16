@@ -2,7 +2,7 @@ import asyncio
 import pathlib
 
 from callosum import Peer
-from callosum.rpc.thrift import ThriftServerAdaptor
+from callosum.upper.thrift import ThriftServerAdaptor
 import thriftpy
 
 

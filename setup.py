@@ -79,7 +79,8 @@ setup(
     ],
     packages=[
         'callosum',
-        'callosum.rpc',
+        'callosum.lower',
+        'callosum.upper',
     ],
     python_requires='>=3.6',
     setup_requires=['setuptools>=38.6.0'],

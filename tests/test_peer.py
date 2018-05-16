@@ -1,5 +1,3 @@
-import pytest
-
 from callosum import Peer
 
 
