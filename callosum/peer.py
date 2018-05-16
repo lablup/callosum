@@ -5,11 +5,11 @@ import secrets
 
 import aiojobs
 from async_timeout import timeout
-import zmq, zmq.asyncio
 
 from .exceptions import ServerError, HandlerError
 from .io import AsyncBytesIO
 from .message import Message, MessageTypes
+from .lower.zeromq import ZeroMQTransport
 
 
 def _wrap_serializer(serializer):
@@ -53,9 +53,7 @@ class Peer:
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
-        self._zctx = zmq.asyncio.Context()
-        self._server_sock = None
-        self._client_sock = None
+        self._transport = ZeroMQTransport()
         self._func_registry = {}
         self._stream_registry = {}
 
@@ -85,12 +83,9 @@ class Peer:
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
-        if self._server_sock is None:
-            self._server_sock = self._zctx.socket(zmq.PAIR)
-            self._server_sock.setsockopt(zmq.LINGER, 100)
-            self._server_sock.bind(self._bind)
+        await self._transport.bind(self._bind)
         while True:
-            raw_msg = await self._server_sock.recv_multipart()
+            raw_msg = await self._transport.recv_message()
             request = Message.from_zmsg(raw_msg, self._deserializer)
             try:
                 handler = self._lookup(request.msgtype, request.method)
@@ -106,24 +101,17 @@ class Peer:
                 response = Message.error(request, e)
             else:
                 response = Message.result(request, result)
-            await self._server_sock.send_multipart(
+            await self._transport.send_message(
                 response.to_zmsg(self._serializer, self._compress))
 
     async def close(self):
         if self._scheduler is not None:
             await self._scheduler.close()
-        if self._server_sock is not None:
-            self._server_sock.close()
-        if self._client_sock is not None:
-            self._client_sock.close()
-        if self._zctx is not None:
-            self._zctx.term()
+        if self._transport is not None:
+            await self._transport.close()
 
     async def invoke(self, method, body, *, order_key=None, invoke_timeout=None):
-        if self._client_sock is None:
-            self._client_sock = self._zctx.socket(zmq.PAIR)
-            self._client_sock.setsockopt(zmq.LINGER, 100)
-            self._client_sock.connect(self._connect)
+        await self._transport.connect(self._connect)
         if invoke_timeout is None:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
@@ -149,9 +137,9 @@ class Peer:
                             None,
                             writer.getvalue(),
                         )
-                        await self._client_sock.send_multipart(
+                        await self._transport.send_message(
                             request.to_zmsg(identity, self._compress))
-                        zmsg = await self._client_sock.recv_multipart()
+                        zmsg = await self._transport.recv_message()
                         response = Message.from_zmsg(zmsg, identity)
                         # TODO: handle "outer" protocol errors
                         reader.write(response.body)
@@ -168,9 +156,9 @@ class Peer:
                         None,
                         body,
                     )
-                    await self._client_sock.send_multipart(
+                    await self._transport.send_message(
                         request.to_zmsg(self._serializer, self._compress))
-                    zmsg = await self._client_sock.recv_multipart()
+                    zmsg = await self._transport.recv_message()
                     response = Message.from_zmsg(zmsg, self._deserializer)
                     if response.msgtype == MessageTypes.RESULT:
                         pass
@@ -183,8 +171,10 @@ class Peer:
                     return response.body
         except (asyncio.TimeoutError, asyncio.CancelledError):
             cancel_request = Message.cancel(request)
-            await self._client_sock.send_multipart(
+            await self._transport.send_message(
                 cancel_request.to_zmsg(self._serializer))
+            raise
+        except Exception:
             raise
 
     async def send_stream(self, order_key, metadata, stream, *, reporthook=None):
