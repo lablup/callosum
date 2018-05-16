@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import enum
-import struct
 from typing import Optional
 
 import msgpack
