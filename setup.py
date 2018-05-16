@@ -13,7 +13,7 @@ def read_src_version():
 
 
 install_requires = [
-    'aiojobs=>2.1.0',
+    'aiojobs>=0.2.1',
     'async_timeout',
     'dataclasses; python_version<"3.7"',
     'msgpack>=0.5.0',

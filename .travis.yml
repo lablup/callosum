@@ -21,7 +21,8 @@ jobs:
 
     - stage: test
       install:
-        - pip install -U -e ".[ci]"
+        - pip install -U setuptools pip
+        - pip install -U -e ".[ci,thrift]"
       script:
         - python -m flake8
         - python -m pytest
