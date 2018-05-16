@@ -12,6 +12,9 @@ stages:
   - name: deploy
     if: tag IS present
 
+python:
+  - "3.6"
+
 # stage def.
 jobs:
   include:
@@ -26,6 +29,7 @@ jobs:
         - codecov
 
     - stage: deploy
+      python: "3.6"
       install: skip
       script: skip
       after_script: skip
