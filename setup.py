@@ -39,7 +39,7 @@ dev_requires = build_requires + test_requires + [
     'pytest-sugar',
 ]
 
-ci_requires = []
+ci_requires = build_requires + test_requires + []
 
 docs_requires = [
     'sphinx',
