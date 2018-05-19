@@ -86,7 +86,7 @@ class Peer:
         await self._transport.bind(self._bind)
         while True:
             raw_msg = await self._transport.recv_message()
-            request = Message.from_zmsg(raw_msg, self._deserializer)
+            request = Message.decode(raw_msg, self._deserializer)
             try:
                 handler = self._lookup(request.msgtype, request.method)
                 job = await self._scheduler.spawn(
@@ -102,7 +102,7 @@ class Peer:
             else:
                 response = Message.result(request, result)
             await self._transport.send_message(
-                response.to_zmsg(self._serializer, self._compress))
+                response.encode(self._serializer, self._compress))
 
     async def close(self):
         if self._scheduler is not None:
@@ -138,9 +138,9 @@ class Peer:
                             writer.getvalue(),
                         )
                         await self._transport.send_message(
-                            request.to_zmsg(identity, self._compress))
-                        zmsg = await self._transport.recv_message()
-                        response = Message.from_zmsg(zmsg, identity)
+                            request.encode(identity, self._compress))
+                        raw_msg = await self._transport.recv_message()
+                        response = Message.decode(raw_msg, identity)
                         # TODO: handle "outer" protocol errors
                         reader.write(response.body)
                         reader.seek(0, io.SEEK_SET)
@@ -157,9 +157,9 @@ class Peer:
                         body,
                     )
                     await self._transport.send_message(
-                        request.to_zmsg(self._serializer, self._compress))
+                        request.encode(self._serializer, self._compress))
                     zmsg = await self._transport.recv_message()
-                    response = Message.from_zmsg(zmsg, self._deserializer)
+                    response = Message.decode(zmsg, self._deserializer)
                     if response.msgtype == MessageTypes.RESULT:
                         pass
                     elif response.msgtype == MessageTypes.FAILURE:
@@ -172,7 +172,7 @@ class Peer:
         except (asyncio.TimeoutError, asyncio.CancelledError):
             cancel_request = Message.cancel(request)
             await self._transport.send_message(
-                cancel_request.to_zmsg(self._serializer))
+                cancel_request.encode(self._serializer))
             raise
         except Exception:
             raise

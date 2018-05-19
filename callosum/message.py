@@ -1,9 +1,13 @@
-from dataclasses import dataclass
 import enum
-from typing import Optional
+import sys
+from typing import Optional, Tuple
 
+import attr
 import msgpack
 import snappy
+
+
+# TODO(FUTURE): zero-copy serialization and de-serialization
 
 
 def mpackb(v):
@@ -11,7 +15,63 @@ def mpackb(v):
 
 
 def munpackb(b):
-    return msgpack.unpackb(b, encoding='utf8', use_list=False)
+    return msgpack.unpackb(b, raw=False, use_list=False)
+
+
+class TupleEncodingMixin:
+    '''
+    Encodes the class values in order into a msgpack tuple
+    and decodes the object from such msgpack tuples.
+
+    The class must be an attrs class.
+    '''
+
+    __slots__ = tuple()
+
+    @classmethod
+    def decode(cls, buffer):
+        if not buffer:
+            return None
+        return cls(*munpackb(buffer))
+
+    def encode(self):
+        cls = type(self)
+        values = [getattr(self, f.name) for f in attr.fields(cls)]
+        return mpackb(values)
+
+
+class Metadata(TupleEncodingMixin, object):
+    '''
+    Base type for metadata.
+    '''
+    pass
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class FunctionMetadata(Metadata):
+    pass
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class ResultMetadata(Metadata):
+    pass
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class StreamMetadata(Metadata):
+    resource_name: str
+    length: int
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class ErrorMetadata(Metadata):
+    name: str
+    stack: str
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class NullMetadata(Metadata):
+    pass
 
 
 class MessageTypes(enum.IntEnum):
@@ -21,78 +81,6 @@ class MessageTypes(enum.IntEnum):
     FAILURE = 3  # error from user handlers
     ERROR = 4    # error from callosum or underlying libraries
     CANCEL = 5   # client-side timeout/cancel
-
-
-@dataclass(frozen=True)
-class FunctionMetadata:
-    compressed: bool
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        if not buffer:
-            return None
-        return cls(*munpackb(buffer))
-
-    def to_bytes(self):
-        return mpackb((self.compressed, ))
-
-
-@dataclass
-class ResultMetadata:
-    compressed: bool
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        if not buffer:
-            return None
-        return cls(*munpackb(buffer))
-
-    def to_bytes(self):
-        return mpackb((self.compressed, ))
-
-
-@dataclass(frozen=True)
-class StreamMetadata:
-    compressed: bool
-    resource_name: str
-    length: int
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        if not buffer:
-            return None
-        return cls(*munpackb(buffer))
-
-    def to_bytes(self):
-        return mpackb((self.resource_name, self.length))
-
-
-@dataclass(frozen=True)
-class ErrorMetadata:
-    name: str
-    stack: str
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        if not buffer:
-            return None
-        return cls(*munpackb(buffer))
-
-    def to_bytes(self):
-        return mpackb((self.name, self.stack))
-
-
-@dataclass(frozen=True)
-class NullMetadata:
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        if not buffer:
-            return None
-        return cls(*munpackb(buffer))
-
-    def to_bytes(self):
-        return mpackb(tuple())
 
 
 metadata_types = (
@@ -105,19 +93,16 @@ metadata_types = (
 )
 
 
-@dataclass(frozen=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class Message:
-
-    __slots__ = (
-        'msgtype', 'method',
-        'order_key', 'seq_id',
-        'metadata', 'body')
-
+    # header parts
     msgtype: MessageTypes
     method: str        # function/stream ID
     order_key: str  # replied back as-is
     seq_id: int      # replied back as-is
-    metadata: Optional[StreamMetadata]
+
+    # body parts (compressable)
+    metadata: Optional[Metadata]
     body: bytes
 
     @classmethod
@@ -125,7 +110,7 @@ class Message:
         return cls(
             MessageTypes.RESULT,
             request.method, request.order_key, request.seq_id,
-            ResultMetadata(True),
+            ResultMetadata(),
             result_body,
         )
 
@@ -139,12 +124,14 @@ class Message:
         )
 
     @classmethod
-    def error(cls, request, exc):
+    def error(cls, request, exc_info=None):
+        if exc_info is None:
+            exc_info = sys.exc_info()
         return cls(
             MessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
-            ErrorMetadata(type(exc).__name__, ''),
-            mpackb(tuple(map(str, exc.args))),
+            ErrorMetadata(exc_info[0].__name__, ''),
+            mpackb(list(map(str, exc_info[1].args))),
         )
 
     @classmethod
@@ -156,21 +143,15 @@ class Message:
         )
 
     @classmethod
-    def from_zmsg(cls, zmsg, deserializer):
-        header = munpackb(zmsg[0])
-        assert isinstance(header['type'], int)
-        assert isinstance(header['meth'], str)
-        assert isinstance(header['okey'], str)
-        assert isinstance(header['seq'], int)
-        assert isinstance(header['zip'], bool)
+    def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
+        header = munpackb(raw_msg[0])
         msgtype = MessageTypes(header['type'])
         compressed = header['zip']
-        data = zmsg[1]
+        data = raw_msg[1]
         if compressed:
             data = snappy.decompress(data)
         data = munpackb(data)
-        assert isinstance(data['meta'], bytes)
-        metadata = metadata_types[msgtype].from_bytes(data['meta'])
+        metadata = metadata_types[msgtype].decode(data['meta'])
         return cls(msgtype,
                    header['meth'],
                    header['okey'],
@@ -178,10 +159,10 @@ class Message:
                    metadata,
                    deserializer(data['body']))
 
-    def to_zmsg(self, serializer, compress=True):
+    def encode(self, serializer, compress: bool=True) -> Tuple[bytes, bytes]:
         metadata = b''
         if self.metadata is not None:
-            metadata = self.metadata.to_bytes()
+            metadata = self.metadata.encode()
         header = {
             'type': int(self.msgtype),
             'meth': self.method,

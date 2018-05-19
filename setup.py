@@ -15,7 +15,7 @@ def read_src_version():
 install_requires = [
     'aiojobs>=0.2.1',
     'async_timeout',
-    'dataclasses; python_version<"3.7"',
+    'attrs>=18.1.0',
     'msgpack>=0.5.0',
     'pyzmq>=17.0.0',
     'python-snappy>=0.5.1',
