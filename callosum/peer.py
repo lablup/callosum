@@ -57,8 +57,6 @@ class Peer:
         self._func_registry = {}
         self._stream_registry = {}
 
-    # TODO: add handle_service??
-
     def handle_function(self, method, handler):
         self._func_registry[method] = handler
 
@@ -83,26 +81,26 @@ class Peer:
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
-        await self._transport.bind(self._bind)
-        while True:
-            raw_msg = await self._transport.recv_message()
-            request = Message.decode(raw_msg, self._deserializer)
-            try:
-                handler = self._lookup(request.msgtype, request.method)
-                job = await self._scheduler.spawn(
-                    handler(request))
-                # keep outstanding set of jobs identified by the request
-                # so that the client can cancel them.
-                # TODO: implement per-key ordering
-                result = await job.wait()
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                raise
-            except Exception as e:
-                response = Message.error(request, e)
-            else:
-                response = Message.result(request, result)
-            await self._transport.send_message(
-                response.encode(self._serializer, self._compress))
+        async with self._transport.bind(self._bind) as conn:
+            while True:
+                raw_msg = await conn.recv_message()
+                request = Message.decode(raw_msg, self._deserializer)
+                try:
+                    handler = self._lookup(request.msgtype, request.method)
+                    job = await self._scheduler.spawn(
+                        handler(request))
+                    # keep outstanding set of jobs identified by the request
+                    # so that the client can cancel them.
+                    # TODO: implement per-key ordering
+                    result = await job.wait()
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    raise
+                except Exception as e:
+                    response = Message.error(request, e)
+                else:
+                    response = Message.result(request, result)
+                await conn.send_message(
+                    response.encode(self._serializer, self._compress))
 
     async def close(self):
         if self._scheduler is not None:
@@ -110,72 +108,73 @@ class Peer:
         if self._transport is not None:
             await self._transport.close()
 
-    async def invoke(self, method, body, *, order_key=None, invoke_timeout=None):
-        await self._transport.connect(self._connect)
+    async def invoke(self, method, body, *,
+                     order_key=None, invoke_timeout=None):
         if invoke_timeout is None:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
             order_key = secrets.token_hex(8)
             seq_id = 0
-        try:
-            request = None
-            with timeout(invoke_timeout):
-                if callable(body):
-                    reader = AsyncBytesIO()
-                    writer = AsyncBytesIO()
+        with timeout(invoke_timeout):
+            async with self._transport.connect(self._connect) as conn:
+                try:
+                    request = None
+                    if callable(body):
+                        reader = AsyncBytesIO()
+                        writer = AsyncBytesIO()
 
-                    def identity(val):
-                        return val
+                        def identity(val):
+                            return val
 
-                    async def send_hook():
-                        nonlocal request, response
+                        async def send_hook():
+                            nonlocal request, response
+                            request = Message(
+                                MessageTypes.FUNCTION,
+                                method,
+                                order_key,
+                                seq_id,
+                                None,
+                                writer.getvalue(),
+                            )
+                            await conn.send_message(
+                                request.encode(identity, self._compress))
+                            raw_msg = await conn.recv_message()
+                            response = Message.decode(raw_msg, identity)
+                            # TODO: handle "outer" protocol errors
+                            reader.write(response.body)
+                            reader.seek(0, io.SEEK_SET)
+
+                        return await body(reader, writer, send_hook)
+                        # TODO: how to handle "inner" protocol errors?
+                    else:
                         request = Message(
                             MessageTypes.FUNCTION,
                             method,
                             order_key,
                             seq_id,
                             None,
-                            writer.getvalue(),
+                            body,
                         )
-                        await self._transport.send_message(
-                            request.encode(identity, self._compress))
-                        raw_msg = await self._transport.recv_message()
-                        response = Message.decode(raw_msg, identity)
-                        # TODO: handle "outer" protocol errors
-                        reader.write(response.body)
-                        reader.seek(0, io.SEEK_SET)
-
-                    return await body(reader, writer, send_hook)
-                    # TODO: how to handle "inner" protocol errors?
-                else:
-                    request = Message(
-                        MessageTypes.FUNCTION,
-                        method,
-                        order_key,
-                        seq_id,
-                        None,
-                        body,
-                    )
-                    await self._transport.send_message(
-                        request.encode(self._serializer, self._compress))
-                    zmsg = await self._transport.recv_message()
-                    response = Message.decode(zmsg, self._deserializer)
-                    if response.msgtype == MessageTypes.RESULT:
-                        pass
-                    elif response.msgtype == MessageTypes.FAILURE:
-                        # TODO: encode/decode error info
-                        raise HandlerError(response.body)
-                    elif response.msgtype == MessageTypes.ERROR:
-                        # TODO: encode/decode error info
-                        raise ServerError(response.body)
-                    return response.body
-        except (asyncio.TimeoutError, asyncio.CancelledError):
-            cancel_request = Message.cancel(request)
-            await self._transport.send_message(
-                cancel_request.encode(self._serializer))
-            raise
-        except Exception:
-            raise
+                        await conn.send_message(
+                            request.encode(self._serializer, self._compress))
+                        zmsg = await conn.recv_message()
+                        response = Message.decode(zmsg, self._deserializer)
+                        if response.msgtype == MessageTypes.RESULT:
+                            pass
+                        elif response.msgtype == MessageTypes.FAILURE:
+                            # TODO: encode/decode error info
+                            raise HandlerError(response.body)
+                        elif response.msgtype == MessageTypes.ERROR:
+                            # TODO: encode/decode error info
+                            raise ServerError(response.body)
+                        return response.body
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    cancel_request = Message.cancel(request)
+                    await conn.send_message(
+                        cancel_request.encode(self._serializer))
+                    raise
+                except Exception:
+                    raise
 
     async def send_stream(self, order_key, metadata, stream, *, reporthook=None):
         raise NotImplementedError
