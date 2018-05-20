@@ -9,19 +9,19 @@ from . import (
 class ZeroMQConnection(AbstractMessagingMixin, AbstractStreamingMixin):
 
     async def recv_message(self):
-        assert not self.transport.closed
+        assert not self.transport._closed
         raw_msg = await self.transport._sock.recv_multipart()
         return raw_msg
 
     async def send_message(self, raw_msg):
-        assert not self.transport.closed
+        assert not self.transport._closed
         await self.transport._sock.send_multipart(raw_msg)
 
 
 class ZeroMQBinder(ZeroMQConnection, BaseBinder):
 
     async def __aenter__(self):
-        if not self.transport.closed:
+        if not self.transport._closed:
             return self
         sock = self.transport._zctx.socket(zmq.PAIR)
         # server_key = zmq.auth.load_certificate('test-server.key_secret')
@@ -40,7 +40,7 @@ class ZeroMQBinder(ZeroMQConnection, BaseBinder):
 class ZeroMQConnector(ZeroMQConnection, BaseConnector):
 
     async def __aenter__(self):
-        if not self.transport.closed:
+        if not self.transport._closed:
             return self
         sock = self.transport._zctx.socket(zmq.PAIR)
         # client_key = zmq.auth.load_certificate('test.key_secret')
@@ -64,8 +64,8 @@ class ZeroMQTransport(BaseTransport):
         self._sock = None
 
     @property
-    def closed(self):
-        return self._sock is None or self._sock.closed
+    def _closed(self):
+        return self._sock is None or self._sock._closed
 
     async def close(self):
         if self._sock is not None:

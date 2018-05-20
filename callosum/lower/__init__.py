@@ -57,10 +57,5 @@ class BaseTransport(metaclass=abc.ABCMeta):
     def connect(self, connect_addr):
         return self.connector_cls(self, connect_addr)
 
-    @property
-    @abc.abstractmethod
-    def closed(self):
-        return True
-
     async def close(self):
         pass
