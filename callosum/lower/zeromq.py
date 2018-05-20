@@ -1,12 +1,18 @@
 import zmq, zmq.asyncio, zmq.auth
 
 from . import (
-    BaseBinder, BaseConnector, BaseTransport,
-    AbstractMessagingMixin, AbstractStreamingMixin,
+    AbstractBinder, AbstractConnector,
+    AbstractConnection,
+    BaseTransport,
 )
 
 
-class ZeroMQConnection(AbstractMessagingMixin, AbstractStreamingMixin):
+class ZeroMQConnection(AbstractConnection):
+
+    __slots__ = ('transport', )
+
+    def __init__(self, transport):
+        self.transport = transport
 
     async def recv_message(self):
         assert not self.transport._closed
@@ -18,11 +24,13 @@ class ZeroMQConnection(AbstractMessagingMixin, AbstractStreamingMixin):
         await self.transport._sock.send_multipart(raw_msg)
 
 
-class ZeroMQBinder(ZeroMQConnection, BaseBinder):
+class ZeroMQBinder(AbstractBinder):
+
+    __slots__ = ('transport', 'addr')
 
     async def __aenter__(self):
         if not self.transport._closed:
-            return self
+            return ZeroMQConnection(self.transport)
         sock = self.transport._zctx.socket(zmq.PAIR)
         # server_key = zmq.auth.load_certificate('test-server.key_secret')
         # sock.setsockopt(zmq.CURVE_SERVER, 1)
@@ -30,18 +38,20 @@ class ZeroMQBinder(ZeroMQConnection, BaseBinder):
         # sock.setsockopt(zmq.LINGER, 100)
         sock.bind(self.addr)
         self.transport._sock = sock
-        return self
+        return ZeroMQConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         self.transport._sock.close()
         self.transport._sock = None
 
 
-class ZeroMQConnector(ZeroMQConnection, BaseConnector):
+class ZeroMQConnector(AbstractConnector):
+
+    __slots__ = ('transport', 'addr')
 
     async def __aenter__(self):
         if not self.transport._closed:
-            return self
+            return ZeroMQConnection(self.transport)
         sock = self.transport._zctx.socket(zmq.PAIR)
         # client_key = zmq.auth.load_certificate('test.key_secret')
         # server_key = zmq.auth.load_certificate('test-server.key')
@@ -51,7 +61,10 @@ class ZeroMQConnector(ZeroMQConnection, BaseConnector):
         sock.setsockopt(zmq.LINGER, 100)
         sock.connect(self.addr)
         self.transport._sock = sock
-        return self
+        return ZeroMQConnection(self.transport)
+
+    async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        pass
 
 
 class ZeroMQTransport(BaseTransport):

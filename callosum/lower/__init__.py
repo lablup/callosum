@@ -18,31 +18,58 @@ class AbstractStreamingMixin(metaclass=abc.ABCMeta):
     pass
 
 
-class BaseBinder(AbstractMessagingMixin, AbstractStreamingMixin,
-                 metaclass=abc.ABCMeta):
+class AbstractConnection(AbstractMessagingMixin, AbstractStreamingMixin,
+                         metaclass=abc.ABCMeta):
+    '''
+    An abstract interface for communication operations, except its lifecycle
+    management operations which are responsible to binder and connector.
+    '''
+    pass
+
+
+class AbstractBinder(metaclass=abc.ABCMeta):
+
+    __slots__ = ('transport', 'addr')
 
     def __init__(self, transport, addr):
         self.transport = transport
         self.addr = addr
 
-    async def __aenter__(self):
-        return self
+    @abc.abstractmethod
+    async def __aenter__(self) -> AbstractConnection:
+        '''
+        Create a listening connection bound on self.addr.
+        '''
+        raise NotImplementedError
 
+    @abc.abstractmethod
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        '''
+        Close the listening connection.
+        '''
         pass
 
 
-class BaseConnector(AbstractMessagingMixin, AbstractStreamingMixin,
-                    metaclass=abc.ABCMeta):
+class AbstractConnector(metaclass=abc.ABCMeta):
+
+    __slots__ = ('transport', 'addr')
 
     def __init__(self, transport, addr):
         self.transport = transport
         self.addr = addr
 
-    async def __aenter__(self):
-        return self
+    @abc.abstractmethod
+    async def __aenter__(self) -> AbstractConnection:
+        '''
+        Return a connection to self.addr.
+        '''
+        raise NotImplementedError
 
+    @abc.abstractmethod
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        '''
+        Close/release the connection.
+        '''
         pass
 
 
@@ -58,4 +85,9 @@ class BaseTransport(metaclass=abc.ABCMeta):
         return self.connector_cls(self, connect_addr)
 
     async def close(self):
+        '''
+        Close all open connections and release system resources.
+        This may be left empty for transports without connection pooling or
+        persistent connections.
+        '''
         pass
