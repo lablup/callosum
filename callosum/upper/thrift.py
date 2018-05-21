@@ -63,8 +63,8 @@ class ThriftConnection(AIOThriftConnection):
 
     async def execute(self, api, *args, **kwargs):
         '''
-        This is the strippted down version of the original execute(),
-        with addition of yield statements.
+        This is the copy-and-pasted but stripped-down version of the original
+        execute() method, with addition of yield statements.
         '''
 
         kw = args2kwargs(getattr(self.service, api + "_args").thrift_spec, *args)

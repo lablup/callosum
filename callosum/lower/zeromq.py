@@ -84,9 +84,9 @@ class ZeroMQTransport(BaseTransport):
     '''
     Implementation for the ZeorMQ-backed transport.
 
-    It keeps a single persistent connection over multiple connections.
-    As the underlying PUSH/PULL sockets work asynchronously, this
-    effectively achieves connection pooling reducing handshake overheads.
+    It keeps a single persistent connection over multiple connect/bind() calls.
+    As the underlying PUSH/PULL sockets work asynchronously, this effectively
+    achieves connection pooling reducing handshake overheads.
     '''
 
     binder_cls = ZeroMQBinder
