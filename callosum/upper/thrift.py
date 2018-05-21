@@ -48,6 +48,8 @@ class ThriftServerAdaptor(BaseServerAdaptor):
         except Exception:
             writer.close()
             raise
+        finally:
+            reader.close()
         # Even with oneway requests, Callosum will respond with empty body.
         response_body = writer.getvalue()
         writer.close()
@@ -125,3 +127,5 @@ class ThriftClientAdaptor(BaseClientAdaptor):
             yield result
         finally:
             conn.close()
+            writer.close()
+            reader.close()
