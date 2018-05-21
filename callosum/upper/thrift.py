@@ -94,11 +94,10 @@ class ThriftClientAdaptor(BaseClientAdaptor):
     __slots__ = BaseClientAdaptor.__slots__ + \
         ('_service', '_protocol_cls', '_invoke_timeout')
 
-    def __init__(self, service, *, invoke_timeout=None):
+    def __init__(self, service):
         super().__init__()
         self._service = service
         self._protocol_cls = TBinaryProtocol
-        self._invoke_timeout = invoke_timeout
 
     async def _call(self, method, args, kwargs):
         loop = asyncio.get_event_loop()
@@ -110,7 +109,7 @@ class ThriftClientAdaptor(BaseClientAdaptor):
                                 iprot=iprotocol,
                                 oprot=oprotocol,
                                 address='(callosum-peer)',
-                                loop=loop, timeout=self._invoke_timeout)
+                                loop=loop, timeout=None)
         try:
             execute_agen = conn.execute(method, *args, **kwargs)
             await execute_agen.asend(None)
