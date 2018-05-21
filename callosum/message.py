@@ -47,29 +47,29 @@ class Metadata(TupleEncodingMixin, object):
     pass
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class FunctionMetadata(Metadata):
     pass
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class ResultMetadata(Metadata):
     pass
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class StreamMetadata(Metadata):
     resource_name: str
     length: int
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class ErrorMetadata(Metadata):
     name: str
     stack: str
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class NullMetadata(Metadata):
     pass
 
@@ -93,7 +93,7 @@ metadata_types = (
 )
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True)
 class Message:
     # header parts
     msgtype: MessageTypes
