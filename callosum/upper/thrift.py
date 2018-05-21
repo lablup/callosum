@@ -92,7 +92,7 @@ class ThriftConnection(AIOThriftConnection):
 class ThriftClientAdaptor(BaseClientAdaptor):
 
     __slots__ = BaseClientAdaptor.__slots__ + \
-        ('_service', '_protocol_cls', '_invoke_timeout')
+        ('_service', '_protocol_cls')
 
     def __init__(self, service):
         super().__init__()
