@@ -28,6 +28,10 @@ def _wrap_deserializer(deserializer):
     return _deserialize
 
 
+def _identity(val):
+    return val
+
+
 class Peer:
 
     def __init__(self, *,
@@ -120,32 +124,25 @@ class Peer:
                 try:
                     request = None
                     if callable(body):
-                        reader = AsyncBytesIO()
-                        writer = AsyncBytesIO()
-
-                        def identity(val):
-                            return val
-
-                        async def send_hook():
-                            nonlocal request, response
-                            request = Message(
-                                MessageTypes.FUNCTION,
-                                method,
-                                order_key,
-                                seq_id,
-                                None,
-                                writer.getvalue(),
-                            )
-                            await conn.send_message(
-                                request.encode(identity, self._compress))
-                            raw_msg = await conn.recv_message()
-                            response = Message.decode(raw_msg, identity)
-                            # TODO: handle "outer" protocol errors
-                            reader.write(response.body)
-                            reader.seek(0, io.SEEK_SET)
-
-                        return await body(reader, writer, send_hook)
-                        # TODO: how to handle "inner" protocol errors?
+                        # The user is using an upper-layer adaptor.
+                        agen = body()
+                        request = Message(
+                            MessageTypes.FUNCTION,
+                            method,
+                            order_key,
+                            seq_id,
+                            None,
+                            await agen.asend(None),
+                        )
+                        await conn.send_message(
+                            request.encode(_identity, self._compress))
+                        raw_msg = await conn.recv_message()
+                        response = Message.decode(raw_msg, _identity)
+                        upper_result = await agen.asend(response.body)
+                        try:
+                            await agen.asend(None)
+                        except StopAsyncIteration:
+                            pass
                     else:
                         request = Message(
                             MessageTypes.FUNCTION,
@@ -159,15 +156,16 @@ class Peer:
                             request.encode(self._serializer, self._compress))
                         zmsg = await conn.recv_message()
                         response = Message.decode(zmsg, self._deserializer)
-                        if response.msgtype == MessageTypes.RESULT:
-                            pass
-                        elif response.msgtype == MessageTypes.FAILURE:
-                            # TODO: encode/decode error info
-                            raise HandlerError(response.body)
-                        elif response.msgtype == MessageTypes.ERROR:
-                            # TODO: encode/decode error info
-                            raise ServerError(response.body)
-                        return response.body
+                        upper_result = response.body
+                    if response.msgtype == MessageTypes.RESULT:
+                        pass
+                    elif response.msgtype == MessageTypes.FAILURE:
+                        # TODO: encode/decode error info
+                        raise HandlerError(response.body)
+                    elif response.msgtype == MessageTypes.ERROR:
+                        # TODO: encode/decode error info
+                        raise ServerError(response.body)
+                    return upper_result
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     cancel_request = Message.cancel(request)
                     await conn.send_message(

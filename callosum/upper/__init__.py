@@ -22,13 +22,10 @@ class BaseClientAdaptor:
     def __init__(self):
         pass
 
-    async def _call(self, reader, writer, send_hook, method, args, kwargs):
+    async def _call(self, method, args, kwargs):
         raise NotImplementedError
 
     def __getattr__(self, name):
         def _caller(*args, **kwargs):
-            return functools.partial(self._call,
-                                     method=name,
-                                     args=args,
-                                     kwargs=kwargs)
+            return functools.partial(self._call, name, args, kwargs)
         return _caller
