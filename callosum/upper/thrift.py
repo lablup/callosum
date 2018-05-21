@@ -26,7 +26,7 @@ class ThriftServerAdaptor(BaseServerAdaptor):
         self._protocol_cls = TBinaryProtocol
         self._exec_timeout = exec_timeout
 
-    async def handle_function(self, request):
+    async def handle_function(self, request) -> bytes:
         reader = AsyncBytesIO(request.body)
         writer = AsyncBytesIO()
         iproto = self._protocol_cls(reader)
