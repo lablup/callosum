@@ -1,5 +1,4 @@
 import asyncio
-import io
 from typing import Callable
 import secrets
 
@@ -7,7 +6,6 @@ import aiojobs
 from async_timeout import timeout
 
 from .exceptions import ServerError, HandlerError
-from .io import AsyncBytesIO
 from .message import Message, MessageTypes
 from .lower.zeromq import ZeroMQTransport
 
