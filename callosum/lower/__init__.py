@@ -75,8 +75,13 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
 class BaseTransport(metaclass=abc.ABCMeta):
 
+    __slots__ = ('authenticator', )
+
     binder_cls = None
     connector_cls = None
+
+    def __init__(self, authenticator, **kwargs):
+        self.authenticator = authenticator
 
     def bind(self, bind_addr):
         return self.binder_cls(self, bind_addr)

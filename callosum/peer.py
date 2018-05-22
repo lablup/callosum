@@ -1,12 +1,14 @@
 import asyncio
-from typing import Callable
+from typing import Callable, Type
 import secrets
 
 import aiojobs
 from async_timeout import timeout
 
+from .auth import AbstractAuthenticator
 from .exceptions import ServerError, HandlerError
 from .message import Message, MessageTypes
+from .lower import BaseTransport
 from .lower.zeromq import ZeroMQTransport
 
 
@@ -37,6 +39,8 @@ class Peer:
                  bind: str=None,
                  serializer: Callable=None,
                  deserializer: Callable=None,
+                 transport_cls: Type[BaseTransport]=ZeroMQTransport,
+                 authenticator: AbstractAuthenticator=None,
                  compress: bool=True,
                  max_body_size: int=10 * (2**20),  # 10 MiBytes
                  max_concurrency: int=100,
@@ -55,7 +59,7 @@ class Peer:
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
-        self._transport = ZeroMQTransport()
+        self._transport = transport_cls(authenticator=authenticator)
         self._func_registry = {}
         self._stream_registry = {}
 
