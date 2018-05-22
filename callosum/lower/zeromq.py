@@ -9,6 +9,7 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
+from ..auth import Identity
 
 ZAP_VERSION = b'1.0'
 
@@ -52,7 +53,7 @@ class ZAPServer:
                 await self._send_zap_reply(msg[1], b'400', b'Not enough frames')
             return
 
-        version, request_id, domain, address, identity, mechanism = msg[:6]
+        version, request_id, domain, address, sock_identity, mechanism = msg[:6]
         credentials = msg[6:]
         domain = domain.decode('utf8', 'replace')
         address = address.decode('utf8', 'replace')
@@ -63,9 +64,9 @@ class ZAPServer:
             return
 
         self.log.debug('version: %r, request_id: %r, domain: %r, '
-                       'address: %r, identity: %r, mechanism: %r',
+                       'address: %r, sock_identity: %r, mechanism: %r',
                        version, request_id, domain,
-                       address, identity, mechanism)
+                       address, sock_identity, mechanism)
         allowed = False
         user_id = '<anonymous>'
         reason = b'Access denied'
@@ -83,7 +84,8 @@ class ZAPServer:
                                            b'400', b'Invalid credentials')
                 return
             key = credentials[0]
-            result = await self._authenticator.check_client(domain, key)
+            client_id = Identity(domain, key)
+            result = await self._authenticator.check_client(client_id)
             allowed = result.success
             if allowed:
                 user_id = result.user_id
@@ -136,11 +138,13 @@ class ZeroMQBinder(AbstractBinder):
         pull_sock = self.transport._zctx.socket(zmq.PULL)
         push_sock = self.transport._zctx.socket(zmq.PUSH)
         if self.transport.authenticator:
-            server_private_key = await self.transport.authenticator.server_identity()
+            server_id = await self.transport.authenticator.server_identity()
+            pull_sock.zap_domain = server_id.domain.encode('utf8')
             pull_sock.setsockopt(zmq.CURVE_SERVER, 1)
-            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, server_private_key)
+            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
+            push_sock.zap_domain = server_id.domain.encode('utf8')
             push_sock.setsockopt(zmq.CURVE_SERVER, 1)
-            push_sock.setsockopt(zmq.CURVE_SECRETKEY, server_private_key)
+            push_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
         for key, value in self.transport._zsock_opts.items():
             pull_sock.setsockopt(key, value)
             push_sock.setsockopt(key, value)
@@ -166,15 +170,17 @@ class ZeroMQConnector(AbstractConnector):
         push_sock = self.transport._zctx.socket(zmq.PUSH)
         if self.transport.authenticator:
             auth = self.transport.authenticator
-            client_private_key = await auth.client_identity()
+            client_id = await auth.client_identity()
             client_public_key = await auth.client_public_key()
             server_public_key = await auth.server_public_key()
+            pull_sock.zap_domain = client_id.domain.encode('utf8')
             pull_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             pull_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, client_private_key)
+            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
+            push_sock.zap_domain = client_id.domain.encode('utf8')
             push_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             push_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-            push_sock.setsockopt(zmq.CURVE_SECRETKEY, client_private_key)
+            push_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
         for key, value in self.transport._zsock_opts.items():
             pull_sock.setsockopt(key, value)
             push_sock.setsockopt(key, value)

@@ -10,6 +10,12 @@ class AuthResult:
     user_id: str = None
 
 
+@attr.dataclass(frozen=True, slots=True)
+class Identity:
+    domain: str
+    private_key: bytes
+
+
 def create_keypair(self):
     public_key, private_key = zmq.curve_keypair()
     return public_key, private_key
@@ -20,21 +26,18 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
     Users of Callosum should subclass this to implement custom authentication.
     '''
 
-    def __init__(self, transport):
-        self.transport = transport
-
     # === Binder APIs ===
 
     @abc.abstractmethod
-    async def server_identity(self) -> bytes:
+    async def server_identity(self) -> Identity:
         '''
-        Return the private key of the server.
+        Return the identity of the server.
         Only used by the binder.
         '''
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def check_client(self, domain: str, key: bytes) -> AuthResult:
+    async def check_client(self, client_id: Identity) -> AuthResult:
         '''
         Check if the given domain and client public key is a valid one or not.
         Only used by the binder.
@@ -52,9 +55,9 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def client_identity(self) -> bytes:
+    async def client_identity(self) -> Identity:
         '''
-        Return the private key of the client.
+        Return the identity of the client.
         Only used by the connector.
         '''
         raise NotImplementedError
