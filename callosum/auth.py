@@ -17,6 +17,11 @@ class Identity:
 
 
 def create_keypair(self):
+    '''
+    Generate a new CURVE-25519 public-private keypair.
+    '''
+    # NOTE: currently we rely on zmq for convenience, but we may use libnacl directly
+    #       if we want to isolate this module from zmq dependency.
     public_key, private_key = zmq.curve_keypair()
     return public_key, private_key
 
@@ -24,6 +29,12 @@ def create_keypair(self):
 class AbstractAuthenticator(metaclass=abc.ABCMeta):
     '''
     Users of Callosum should subclass this to implement custom authentication.
+
+    Tough `lower.zeromq` uses the keypair to encrypt the traffic as well as
+    authenticate the peer sockets, but this is not a mandatory requirement for
+    transport implementations.  A transport may simply use its own network-level
+    encryption and/or authentication scheme while leaving this authenticator as an
+    application-level identity management scheme.
     '''
 
     # === Binder APIs ===
