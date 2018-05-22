@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-import zmq, zmq.asyncio, zmq.auth
+import zmq, zmq.asyncio
 import yarl
 
 from . import (
@@ -136,7 +136,7 @@ class ZeroMQBinder(AbstractBinder):
         pull_sock = self.transport._zctx.socket(zmq.PULL)
         push_sock = self.transport._zctx.socket(zmq.PUSH)
         if self.transport.authenticator:
-            server_private_key = self.transport.authenticator.server_identity()
+            server_private_key = await self.transport.authenticator.server_identity()
             pull_sock.setsockopt(zmq.CURVE_SERVER, 1)
             pull_sock.setsockopt(zmq.CURVE_SECRETKEY, server_private_key)
             push_sock.setsockopt(zmq.CURVE_SERVER, 1)
@@ -165,9 +165,10 @@ class ZeroMQConnector(AbstractConnector):
         pull_sock = self.transport._zctx.socket(zmq.PULL)
         push_sock = self.transport._zctx.socket(zmq.PUSH)
         if self.transport.authenticator:
-            client_private_key = self.transport.authenticator.client_identity()
-            client_public_key = self.transport.authenticator.client_public_key()
-            server_public_key = self.transport.authenticator.server_public_key()
+            auth = self.transport.authenticator
+            client_private_key = await auth.client_identity()
+            client_public_key = await auth.client_public_key()
+            server_public_key = await auth.server_public_key()
             pull_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             pull_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
             pull_sock.setsockopt(zmq.CURVE_SECRETKEY, client_private_key)
