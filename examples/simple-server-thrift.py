@@ -27,6 +27,7 @@ async def serve():
         SimpleDispatcher())
     peer.handle_function('simple', adaptor.handle_function)
     try:
+        await peer.open()
         await peer.listen()
     except asyncio.CancelledError:
         await peer.close()

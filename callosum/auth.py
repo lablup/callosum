@@ -30,7 +30,7 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
     '''
     Users of Callosum should subclass this to implement custom authentication.
 
-    Tough `lower.zeromq` uses the keypair to encrypt the traffic as well as
+    Though `lower.zeromq` uses the keypair to encrypt the traffic as well as
     authenticate the peer sockets, but this is not a mandatory requirement for
     transport implementations.  A transport may simply use its own network-level
     encryption and/or authentication scheme while leaving this authenticator as an

@@ -23,6 +23,7 @@ async def serve():
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
     try:
+        await peer.open()
         await peer.listen()
     except asyncio.CancelledError:
         await peer.close()

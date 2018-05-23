@@ -17,6 +17,7 @@ async def call():
     peer = Peer(connect='tcp://localhost:5000',
                 invoke_timeout=2.0)
     adaptor = ThriftClientAdaptor(simple_thrift.SimpleService)
+    await peer.open()
     response = await peer.invoke(
         'simple',
         adaptor.echo(secrets.token_hex(16)))

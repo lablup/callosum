@@ -11,6 +11,7 @@ async def call():
                 serializer=json.dumps,
                 deserializer=json.loads,
                 invoke_timeout=2.0)
+    await peer.open()
     response = await peer.invoke('echo', {
         'sent': secrets.token_hex(16),
     })

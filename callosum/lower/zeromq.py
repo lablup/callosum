@@ -10,6 +10,7 @@ from . import (
     BaseTransport,
 )
 from ..auth import Identity
+from ..compat import current_loop
 
 ZAP_VERSION = b'1.0'
 
@@ -215,7 +216,7 @@ class ZeroMQTransport(BaseTransport):
     connector_cls = ZeroMQConnector
 
     def __init__(self, authenticator, **kwargs):
-        loop = asyncio.get_event_loop()
+        loop = current_loop()
         self._zap_server = None
         self._zap_task = None
         self._zsock_opts = {

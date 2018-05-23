@@ -105,6 +105,10 @@ class Message:
     metadata: Optional[Metadata]
     body: bytes
 
+    @property
+    def request_id(self):
+        return (self.method, self.order_key, self.seq_id)
+
     @classmethod
     def result(cls, request, result_body):
         return cls(
