@@ -22,10 +22,10 @@ class AsyncResolver:
 
     def resolve(self, key, result):
         fut = self._futures.pop(key, None)
-        if fut is not None:
-            if fut.cancelled():
-                self._log.debug('resolved cancelled request: %r', key)
-                return
-            fut.set_result(result)
-        else:
+        if fut is None:
             self._log.warning('resolved unknown request: %r', key)
+            return
+        if fut.cancelled():
+            self._log.debug('resolved cancelled request: %r', key)
+            return
+        fut.set_result(result)
