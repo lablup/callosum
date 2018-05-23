@@ -75,6 +75,8 @@ class _SeqItem:
 
 class EnterOrderedAsyncResolver(AbstractAsyncResolver):
 
+    __slots__ = ('_log', '_futures', '_pending')
+
     def __init__(self):
         self._log = logging.getLogger(__name__ + '.EnterOrderedAsyncResolver')
         self._futures = {}
@@ -163,7 +165,6 @@ class ExitOrderedAsyncResolver(AbstractAsyncResolver):
                 result = self._results.pop(rid)
                 fut = self._futures.pop(rid, None)
                 _resolve_future(rid, fut, result)
-                print('resolve', okey, s.seq, seq)
             else:
                 break
         if len(self._sequences[okey]) == 0:
