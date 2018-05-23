@@ -11,7 +11,7 @@ from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
 from .message import Message, MessageTypes
-from .ordering import AsyncResolver
+from .ordering import AsyncResolver, EnterOrderedAsyncResolver, ExitOrderedAsyncResolver
 from .lower import BaseTransport
 from .lower.zeromq import ZeroMQTransport
 
@@ -93,7 +93,9 @@ class Peer:
         # incoming queues
         self._streaming_chunks = asyncio.Queue()
         self._function_requests = asyncio.Queue()
-        self._function_resolver = AsyncResolver()
+        self._invocation_resolver = AsyncResolver()
+        self._ordered_func_resolver = EnterOrderedAsyncResolver()
+        # self._ordered_func_resolver = ExitOrderedAsyncResolver()
 
         # there is only one outgoing queue
         self._outgoing_queue = asyncio.Queue()
@@ -127,10 +129,13 @@ class Peer:
                 msg = Message.decode(raw_msg, self._deserializer)
                 if msg.msgtype == MessageTypes.FUNCTION:
                     self._function_requests.put_nowait(msg)
+                if msg.msgtype == MessageTypes.CANCEL:
+                    # TODO: implement cancellation
+                    pass
                 elif msg.msgtype == MessageTypes.STREAM:
                     self._streaming_chunks.put_nowait(msg)
                 elif msg.msgtype == MessageTypes.RESULT:
-                    self._function_resolver.resolve(msg.request_id, msg)
+                    self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
 
@@ -182,23 +187,29 @@ class Peer:
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
+        loop = current_loop()
         while True:
             request = await self._function_requests.get()
-            try:
-                handler = self._lookup(request.msgtype, request.method)
-                job = await self._scheduler.spawn(
-                    handler(request))
-                # keep outstanding set of jobs identified by the request
-                # so that the client can cancel them.
-                # TODO: implement per-key ordering
-                result = await job.wait()
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                raise
-            except Exception as e:
-                response = Message.error(request, e)
-            else:
-                response = Message.result(request, result)
-            await self._outgoing_queue.put(response)
+            handler = self._lookup(request.msgtype, request.method)
+
+            async def _func_task(request, handler):
+                rqst_id = request.request_id
+                try:
+                    await self._ordered_func_resolver.schedule(
+                        rqst_id,
+                        self._scheduler,
+                        handler(request))
+                    result = await self._ordered_func_resolver.wait(rqst_id)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    raise
+                except Exception as e:
+                    print(e)
+                    response = Message.error(request, e)
+                else:
+                    response = Message.result(request, result)
+                await self._outgoing_queue.put(response)
+
+            loop.create_task(_func_task(request, handler))
 
     async def invoke(self, method, body, *,
                      order_key=None, invoke_timeout=None):
@@ -209,6 +220,7 @@ class Peer:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
             order_key = secrets.token_hex(8)
+        self._seq_id += 1
         with timeout(invoke_timeout):
             try:
                 request = None
@@ -224,7 +236,8 @@ class Peer:
                         await agen.asend(None),
                     )
                     await self._outgoing_queue.put(request)
-                    response = await self._function_resolver.wait(request.request_id)
+                    response = await self._invocation_resolver.wait(
+                        request.request_id)
                     upper_result = await agen.asend(response.body)
                     try:
                         await agen.asend(None)
@@ -240,9 +253,9 @@ class Peer:
                         body,
                     )
                     await self._outgoing_queue.put(request)
-                    response = await self._function_resolver.wait(request.request_id)
+                    response = await self._invocation_resolver.wait(
+                        request.request_id)
                     upper_result = response.body
-                self._seq_id += 1
                 if response.msgtype == MessageTypes.RESULT:
                     pass
                 elif response.msgtype == MessageTypes.FAILURE:
