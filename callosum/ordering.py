@@ -10,12 +10,12 @@ import attr
 from .compat import current_loop
 
 
-def _resolve_future(request_id, fut, result):
+def _resolve_future(request_id, fut, result, log):
     if fut is None:
-        self._log.warning('resolved unknown request: %r', request_id)
+        log.warning('resolved unknown request: %r', request_id)
         return
     if fut.cancelled():
-        self._log.debug('resolved cancelled request: %r', request_id)
+        log.debug('resolved cancelled request: %r', request_id)
         return
     # TODO: handle exceptions
     fut.set_result(result)
@@ -58,7 +58,7 @@ class AsyncResolver:
 
     def resolve(self, request_id, result):
         fut = self._futures.pop(request_id, None)
-        _resolve_future(request_id, fut, result)
+        _resolve_future(request_id, fut, result, self._log)
 
 
 @functools.total_ordering
@@ -102,7 +102,7 @@ class EnterOrderedAsyncResolver(AbstractAsyncResolver):
             _, okey, _ = rqst_id
             s.ev.set()
             fut = self._futures[rqst_id]
-            _resolve_future(rqst_id, fut, task.result())
+            _resolve_future(rqst_id, fut, task.result(), self._log)
             if len(self._pending[okey]) == 0:
                 # TODO: check if pending is cleared
                 del self._pending[okey]
@@ -164,7 +164,7 @@ class ExitOrderedAsyncResolver(AbstractAsyncResolver):
                 heapq.heappop(self._sequences[okey])
                 result = self._results.pop(rid)
                 fut = self._futures.pop(rid, None)
-                _resolve_future(rid, fut, result)
+                _resolve_future(rid, fut, result, self._log)
             else:
                 break
         if len(self._sequences[okey]) == 0:
