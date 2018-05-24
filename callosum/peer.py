@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import logging
 from typing import Callable, Type
 import secrets
 
@@ -11,7 +12,10 @@ from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
 from .message import Message, MessageTypes
-from .ordering import AsyncResolver, EnterOrderedAsyncResolver, ExitOrderedAsyncResolver
+from .ordering import (
+    AsyncResolver, AbstractAsyncScheduler,
+    KeySerializedAsyncScheduler,
+)
 from .lower import BaseTransport
 from .lower.zeromq import ZeroMQTransport
 
@@ -64,6 +68,7 @@ class Peer:
                  deserializer: Callable=None,
                  transport_cls: Type[BaseTransport]=ZeroMQTransport,
                  authenticator: AbstractAuthenticator=None,
+                 scheduler: AbstractAsyncScheduler=None,
                  compress: bool=True,
                  max_body_size: int=10 * (2**20),  # 10 MiBytes
                  max_concurrency: int=100,
@@ -94,13 +99,16 @@ class Peer:
         self._streaming_chunks = asyncio.Queue()
         self._function_requests = asyncio.Queue()
         self._invocation_resolver = AsyncResolver()
-        self._ordered_func_resolver = EnterOrderedAsyncResolver()
-        # self._ordered_func_resolver = ExitOrderedAsyncResolver()
+        if scheduler is None:
+            scheduler = KeySerializedAsyncScheduler()
+        self._func_scheduler = scheduler
 
         # there is only one outgoing queue
         self._outgoing_queue = asyncio.Queue()
         self._recv_task = None
         self._send_task = None
+
+        self._log = logging.getLogger(__name__ + '.Peer')
 
     def handle_function(self, method, handler):
         self._func_registry[method] = handler
@@ -195,15 +203,15 @@ class Peer:
             async def _func_task(request, handler):
                 rqst_id = request.request_id
                 try:
-                    await self._ordered_func_resolver.schedule(
+                    await self._func_scheduler.schedule(
                         rqst_id,
                         self._scheduler,
                         handler(request))
-                    result = await self._ordered_func_resolver.wait(rqst_id)
+                    result = await self._func_scheduler.wait(rqst_id)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     raise
                 except Exception as e:
-                    print(e)
+                    self._log.error('Uncaught exception')
                     response = Message.error(request, e)
                 else:
                     response = Message.result(request, result)

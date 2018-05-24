@@ -14,26 +14,13 @@ def _resolve_future(request_id, fut, result, log):
     if fut is None:
         log.warning('resolved unknown request: %r', request_id)
         return
-    if fut.cancelled():
-        log.debug('resolved cancelled request: %r', request_id)
+    if fut.done():
+        if fut.cancelled():
+            log.debug('resolved cancelled request: %r', request_id)
+        if fut.exception() is not None:
+            log.debug('resolved errored request: %r', request_id)
         return
-    # TODO: handle exceptions
     fut.set_result(result)
-
-
-class AbstractAsyncResolver(metaclass=abc.ABCMeta):
-
-    @abc.abstractmethod
-    async def schedule(self, request_id, scheduler, coro):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def wait(self, request_id) -> asyncio.Future:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    async def cancel(self, request_id):
-        raise NotImplementedError
 
 
 class AsyncResolver:
@@ -61,6 +48,21 @@ class AsyncResolver:
         _resolve_future(request_id, fut, result, self._log)
 
 
+class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    async def schedule(self, request_id, scheduler, coro):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def wait(self, request_id) -> asyncio.Future:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def cancel(self, request_id):
+        raise NotImplementedError
+
+
 @functools.total_ordering
 @attr.dataclass(frozen=True, slots=True, cmp=False)
 class _SeqItem:
@@ -73,12 +75,12 @@ class _SeqItem:
     def __eq__(self, other): return self.seq == other.seq  # noqa
 
 
-class EnterOrderedAsyncResolver(AbstractAsyncResolver):
+class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
     __slots__ = ('_log', '_futures', '_pending')
 
     def __init__(self):
-        self._log = logging.getLogger(__name__ + '.EnterOrderedAsyncResolver')
+        self._log = logging.getLogger(__name__ + '.KeySerializedAsyncScheduler')
         self._futures = {}
         self._pending = defaultdict(list)
 
@@ -118,12 +120,12 @@ class EnterOrderedAsyncResolver(AbstractAsyncResolver):
         pass
 
 
-class ExitOrderedAsyncResolver(AbstractAsyncResolver):
+class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
 
     __slots__ = ('_log', '_futures', '_results', '_sequences')
 
     def __init__(self):
-        self._log = logging.getLogger(__name__ + '.ExitOrderedAsyncResolver')
+        self._log = logging.getLogger(__name__ + '.ExitOrderedAsyncScheduler')
         self._futures = {}
         self._results = {}
         self._sequences = defaultdict(list)
