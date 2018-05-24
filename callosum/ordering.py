@@ -55,7 +55,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def wait(self, request_id) -> asyncio.Future:
+    async def wait(self, request_id):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -115,7 +115,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     def wait(self, request_id) -> asyncio.Future:
         return self._futures.pop(request_id)
 
-    def cancel(self, request_id):
+    async def cancel(self, request_id):
         # TODO: implement
         pass
 
@@ -150,7 +150,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         self._futures[request_id] = fut
         return fut
 
-    def cancel(self, request_id):
+    async def cancel(self, request_id):
         # TODO: implement
         pass
 
