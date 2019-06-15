@@ -102,7 +102,7 @@ class ZAPServer:
 
     async def _send_zap_reply(self, request_id: bytes,
                               status_code: bytes, status_text: bytes,
-                              user_id: str=''):
+                              user_id: str = ''):
         user_id = user_id.encode('utf8', 'replace')
         metadata = b''
         self._log.debug('ZAP reply code=%s text=%s', status_code, status_text)

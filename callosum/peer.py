@@ -17,7 +17,6 @@ from .ordering import (
     KeySerializedAsyncScheduler,
 )
 from .lower import BaseTransport
-from .lower.zeromq import ZeroMQTransport
 
 
 def _wrap_serializer(serializer):
@@ -66,7 +65,7 @@ class Peer:
                  bind: str = None,
                  serializer: Callable = None,
                  deserializer: Callable = None,
-                 transport_cls: Type[BaseTransport] = ZeroMQTransport,
+                 transport_cls: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  scheduler: AbstractAsyncScheduler = None,
                  compress: bool = True,
@@ -89,6 +88,8 @@ class Peer:
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
+        if transport_cls is None:
+            raise ValueError('You must provide a transport class.')
         self._transport = transport_cls(authenticator=authenticator)
         self._func_registry = {}
         self._stream_registry = {}
@@ -280,7 +281,8 @@ class Peer:
             except Exception:
                 raise
 
-    async def send_stream(self, order_key, metadata, stream, *, reporthook = None):
+    async def send_stream(self, order_key, metadata, stream, *,
+                          reporthook=None):
         raise NotImplementedError
 
     async def tunnel(self, remote_addr, *, inet_proto='tcp') -> Tunnel:
