@@ -62,18 +62,18 @@ class Peer:
     '''
 
     def __init__(self, *,
-                 connect: str=None,
-                 bind: str=None,
-                 serializer: Callable=None,
-                 deserializer: Callable=None,
-                 transport_cls: Type[BaseTransport]=ZeroMQTransport,
-                 authenticator: AbstractAuthenticator=None,
-                 scheduler: AbstractAsyncScheduler=None,
-                 compress: bool=True,
-                 max_body_size: int=10 * (2**20),  # 10 MiBytes
-                 max_concurrency: int=100,
-                 execute_timeout: float=None,
-                 invoke_timeout: float=None):
+                 connect: str = None,
+                 bind: str = None,
+                 serializer: Callable = None,
+                 deserializer: Callable = None,
+                 transport_cls: Type[BaseTransport] = ZeroMQTransport,
+                 authenticator: AbstractAuthenticator = None,
+                 scheduler: AbstractAsyncScheduler = None,
+                 compress: bool = True,
+                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
+                 max_concurrency: int = 100,
+                 execute_timeout: float = None,
+                 invoke_timeout: float = None):
 
         if connect is None and bind is None:
             raise ValueError('You must specify either connect or bind.')
@@ -280,7 +280,7 @@ class Peer:
             except Exception:
                 raise
 
-    async def send_stream(self, order_key, metadata, stream, *, reporthook=None):
+    async def send_stream(self, order_key, metadata, stream, *, reporthook = None):
         raise NotImplementedError
 
     async def tunnel(self, remote_addr, *, inet_proto='tcp') -> Tunnel:

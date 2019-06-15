@@ -13,23 +13,22 @@ def read_src_version():
 
 
 install_requires = [
-    'aiojobs>=0.2.1',
-    'async_timeout>=2.0.0',
+    'aiojobs>=0.2.2',
+    'async_timeout>=3.0.1',
     'attrs>=18.1.0',
-    'msgpack>=0.5.0',
-    'pyzmq>=17.0.0',
-    'python-snappy>=0.5.1',
-    'yarl>=1.2.2',
+    'msgpack>=0.6.0',
+    'python-snappy>=0.5.4',
+    'yarl>=1.3.0',
 ]
 
 build_requires = [
-    'wheel>=0.31.0',
-    'twine>=1.11.0',
+    'wheel>=0.33.4',
+    'twine>=1.13.0',
 ]
 
 test_requires = [
-    'pytest>=3.5',
-    'pytest-asyncio',
+    'pytest>=4.6',
+    'pytest-asyncio>=0.10',
     'pytest-cov',
     'pytest-mock',
     'flake8',
@@ -51,6 +50,9 @@ thrift_requires = [
     'aiothrift',
 ]
 
+zmq_requires = [
+    'pyzmq>=18.0.0',
+]
 
 setup(
     name='callosum',
@@ -93,5 +95,6 @@ setup(
         'ci': ci_requires,
         'docs': docs_requires,
         'thrift': thrift_requires,
+        'zmq': zmq_requires,
     },
 )

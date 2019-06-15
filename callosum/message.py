@@ -163,7 +163,8 @@ class Message:
                    metadata,
                    deserializer(data['body']))
 
-    def encode(self, serializer, compress: bool=True) -> Tuple[bytes, bytes]:
+    def encode(self, serializer, compress: bool = True) \
+              -> Tuple[bytes, bytes]:
         metadata = b''
         if self.metadata is not None:
             metadata = self.metadata.encode()
