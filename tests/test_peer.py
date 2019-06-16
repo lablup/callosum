@@ -1,10 +1,15 @@
 from callosum import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+
+import pytest
 
 
-def test_init():
-    p = Peer(connect='tcp://127.0.0.1:5000')
+@pytest.mark.asyncio
+async def test_init():
+    p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             transport=ZeroMQTransport)
 
-    assert p._connect == 'tcp://127.0.0.1:5000'
+    assert p._connect.uri == 'tcp://127.0.0.1:5000'
     assert p._max_concurrency > 0
     assert p._invoke_timeout is None or p._invoke_timeout > 0
     assert p._exec_timeout is None or p._exec_timeout > 0
@@ -12,8 +17,10 @@ def test_init():
     assert len(p._stream_registry) == 0
 
 
-def test_func_registry():
-    p = Peer(connect='tcp://127.0.0.1:5000')
+@pytest.mark.asyncio
+async def test_func_registry():
+    p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             transport=ZeroMQTransport)
 
     def dummy():
         pass
@@ -26,8 +33,10 @@ def test_func_registry():
     assert p._func_registry['dummy'] is dummy
 
 
-def test_stream_registry():
-    p = Peer(connect='tcp://127.0.0.1:5000')
+@pytest.mark.asyncio
+async def test_stream_registry():
+    p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             transport=ZeroMQTransport)
 
     def dummy():
         pass

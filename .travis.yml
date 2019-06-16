@@ -17,7 +17,7 @@ stages:
     if: tag IS present
 
 python:
-  - "3.6"
+  - "3.7"
 
 # stage def.
 jobs:
@@ -26,7 +26,7 @@ jobs:
     - stage: test
       install:
         - pip install -U setuptools pip
-        - pip install -U -e ".[ci,thrift]"
+        - pip install -U -e ".[ci,zeromq,redis]"
       script:
         - python -m flake8
         - python -m pytest
@@ -34,7 +34,7 @@ jobs:
         - codecov
 
     - stage: deploy
-      python: "3.6"
+      python: "3.7"
       install: skip
       script: skip
       after_script: skip
