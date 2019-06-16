@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import abc
 import asyncio
 from collections import defaultdict
 import functools
 import heapq
 import logging
+from typing import Optional
 
 import attr
 
@@ -68,7 +71,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
 class _SeqItem:
     method: str
     seq: int
-    ev: asyncio.Event = None
+    ev: Optional[asyncio.Event] = None
 
     # TODO: handle integer overflow
     def __lt__(self, other): return self.seq < other.seq   # noqa

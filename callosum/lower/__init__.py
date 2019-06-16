@@ -1,15 +1,25 @@
+from __future__ import annotations
+
 import abc
+from typing import AsyncGenerator, Optional, Tuple, Type
+
+from ..auth import AbstractAuthenticator
 
 
 class AbstractMessagingMixin(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    async def recv_message(self):
-        raise NotImplementedError
+    async def recv_message(self) -> AsyncGenerator[
+            Optional[Tuple[bytes, bytes]], None]:
+        yield None
 
     @abc.abstractmethod
-    async def send_message(self, msg):
+    async def send_message(self, raw_msg: Tuple[bytes, bytes]) -> None:
         raise NotImplementedError
+
+
+class AbstractAddress:
+    pass
 
 
 class AbstractStreamingMixin(metaclass=abc.ABCMeta):
@@ -77,8 +87,10 @@ class BaseTransport(metaclass=abc.ABCMeta):
 
     __slots__ = ('authenticator', )
 
-    binder_cls = None
-    connector_cls = None
+    authenticator: AbstractAuthenticator
+
+    binder_cls: Type[AbstractBinder]
+    connector_cls: Type[AbstractConnector]
 
     def __init__(self, authenticator, **kwargs):
         self.authenticator = authenticator

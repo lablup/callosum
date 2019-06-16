@@ -2,6 +2,7 @@ import asyncio
 import pathlib
 
 from callosum import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 from callosum.upper.thrift import ThriftServerAdaptor
 import thriftpy
 
@@ -20,7 +21,8 @@ class SimpleDispatcher:
 
 
 async def serve():
-    peer = Peer(bind='tcp://127.0.0.1:5000')
+    peer = Peer(bind=ZeroMQAddress('tcp://127.0.0.1:5030'),
+                transport=ZeroMQTransport)
     adaptor = ThriftServerAdaptor(
         peer,
         simple_thrift.SimpleService,

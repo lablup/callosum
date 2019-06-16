@@ -4,15 +4,19 @@ import random
 import secrets
 
 from callosum import Peer
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+from callosum.lower.redis import (
+    RedisStreamAddress, RedisStreamTransport
+)
 
 
 async def call():
-    peer = Peer(connect=ZeroMQAddress('tcp://localhost:5020'),
-                transport=ZeroMQTransport,
+    peer = Peer(connect=RedisStreamAddress(
+                    'redis://localhost:16379',
+                    'myservice', 'client-group', 'server1'),
+                transport=RedisStreamTransport,
                 serializer=json.dumps,
                 deserializer=json.loads,
-                invoke_timeout=2.0)
+                invoke_timeout=30.0)
     await peer.open()
     response = await peer.invoke('echo', {
         'sent': secrets.token_hex(16),

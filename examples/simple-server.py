@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from callosum import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
 async def handle_echo(request):
@@ -17,7 +18,8 @@ async def handle_add(request):
 
 
 async def serve():
-    peer = Peer(bind='tcp://127.0.0.1:5000',
+    peer = Peer(bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
+                transport=ZeroMQTransport,
                 serializer=json.dumps,
                 deserializer=json.loads)
     peer.handle_function('echo', handle_echo)

@@ -54,6 +54,10 @@ zmq_requires = [
     'pyzmq>=18.0.0',
 ]
 
+redis_requires = [
+    'aioredis>=1.2.0',
+]
+
 setup(
     name='callosum',
     version=read_src_version(),
@@ -85,7 +89,7 @@ setup(
         'callosum.lower',
         'callosum.upper',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     setup_requires=['setuptools>=38.6.0'],
     install_requires=install_requires,
     extras_require={
@@ -96,5 +100,6 @@ setup(
         'docs': docs_requires,
         'thrift': thrift_requires,
         'zmq': zmq_requires,
+        'redis': redis_requires,
     },
 )

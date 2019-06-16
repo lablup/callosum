@@ -26,8 +26,6 @@ class TupleEncodingMixin:
     The class must be an attrs class.
     '''
 
-    __slots__ = tuple()
-
     @classmethod
     def decode(cls, buffer):
         if not buffer:
@@ -151,10 +149,10 @@ class Message:
         header = munpackb(raw_msg[0])
         msgtype = MessageTypes(header['type'])
         compressed = header['zip']
-        data = raw_msg[1]
+        raw_data: bytes = raw_msg[1]
         if compressed:
-            data = snappy.decompress(data)
-        data = munpackb(data)
+            raw_data = snappy.decompress(raw_data)
+        data = munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
         return cls(msgtype,
                    header['meth'],
@@ -175,7 +173,7 @@ class Message:
             'seq': self.seq_id,
             'zip': compress,
         }
-        header = mpackb(header)
+        serialized_header: bytes = mpackb(header)
         if self.msgtype in (MessageTypes.FUNCTION, MessageTypes.RESULT):
             body = serializer(self.body)
         else:
@@ -184,7 +182,7 @@ class Message:
             'meta': metadata,
             'body': body,
         }
-        data = mpackb(data)
+        serialized_data: bytes = mpackb(data)
         if compress:
-            data = snappy.compress(data)
-        return (header, data)
+            serialized_data = snappy.compress(serialized_data)
+        return (serialized_header, serialized_data)

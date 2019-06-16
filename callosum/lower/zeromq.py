@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import AsyncGenerator, Optional, Tuple, Union
 
+import attr
 import zmq, zmq.asyncio
 import yarl
 
 from . import (
+    AbstractAddress,
     AbstractBinder, AbstractConnector,
     AbstractConnection,
     BaseTransport,
@@ -13,6 +18,11 @@ from ..auth import Identity
 from ..compat import current_loop
 
 ZAP_VERSION = b'1.0'
+
+
+@attr.s(auto_attribs=True, slots=True)
+class ZeroMQAddress(AbstractAddress):
+    uri: Union[str, Tuple[str, int]]
 
 
 class ZAPServer:
@@ -103,12 +113,12 @@ class ZAPServer:
     async def _send_zap_reply(self, request_id: bytes,
                               status_code: bytes, status_text: bytes,
                               user_id: str = ''):
-        user_id = user_id.encode('utf8', 'replace')
         metadata = b''
         self._log.debug('ZAP reply code=%s text=%s', status_code, status_text)
         reply = (ZAP_VERSION, request_id,
                  status_code, status_text,
-                 user_id, metadata)
+                 user_id.encode('utf8', 'replace'),
+                 metadata)
         await self._zap_socket.send_multipart(reply)
 
 
@@ -116,15 +126,18 @@ class ZeroMQConnection(AbstractConnection):
 
     __slots__ = ('transport', )
 
+    transport: ZeroMQTransport
+
     def __init__(self, transport):
         self.transport = transport
 
-    async def recv_message(self):
+    async def recv_message(self) -> AsyncGenerator[
+            Optional[Tuple[bytes, bytes]], None]:
         assert not self.transport._closed
         raw_msg = await self.transport._pull_sock.recv_multipart()
-        return raw_msg
+        yield raw_msg
 
-    async def send_message(self, raw_msg):
+    async def send_message(self, raw_msg: Tuple[bytes, bytes]):
         assert not self.transport._closed
         await self.transport._push_sock.send_multipart(raw_msg)
 
@@ -132,6 +145,9 @@ class ZeroMQConnection(AbstractConnection):
 class ZeroMQBinder(AbstractBinder):
 
     __slots__ = ('transport', 'addr')
+
+    transport: ZeroMQTransport
+    addr: ZeroMQAddress
 
     async def __aenter__(self):
         if not self.transport._closed:
@@ -149,8 +165,8 @@ class ZeroMQBinder(AbstractBinder):
         for key, value in self.transport._zsock_opts.items():
             pull_sock.setsockopt(key, value)
             push_sock.setsockopt(key, value)
-        pull_sock.bind(self.addr)
-        url = yarl.URL(self.addr)
+        pull_sock.bind(self.addr.uri)
+        url = yarl.URL(self.addr.uri)
         push_sock.bind(str(url.with_port(url.port + 1)))
         self.transport._pull_sock = pull_sock
         self.transport._push_sock = push_sock
@@ -163,6 +179,9 @@ class ZeroMQBinder(AbstractBinder):
 class ZeroMQConnector(AbstractConnector):
 
     __slots__ = ('transport', 'addr')
+
+    transport: ZeroMQTransport
+    addr: ZeroMQAddress
 
     async def __aenter__(self):
         if not self.transport._closed:
@@ -185,8 +204,8 @@ class ZeroMQConnector(AbstractConnector):
         for key, value in self.transport._zsock_opts.items():
             pull_sock.setsockopt(key, value)
             push_sock.setsockopt(key, value)
-        push_sock.connect(self.addr)
-        url = yarl.URL(self.addr)
+        push_sock.connect(self.addr.uri)
+        url = yarl.URL(self.addr.uri)
         pull_sock.connect(str(url.with_port(url.port + 1)))
         self.transport._pull_sock = pull_sock
         self.transport._push_sock = push_sock

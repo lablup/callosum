@@ -16,7 +16,7 @@ from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
 )
-from .lower import BaseTransport
+from .lower import AbstractAddress, BaseTransport
 
 
 def _wrap_serializer(serializer):
@@ -39,6 +39,9 @@ def _identity(val):
     return val
 
 
+sentinel = object()
+
+
 @attr.dataclass(frozen=True, slots=True)
 class Tunnel:
     peer: 'Peer'
@@ -51,9 +54,56 @@ class Tunnel:
         pass
 
 
+class Publisher:
+    '''
+    Represents a unidirectional message publisher.
+    '''
+
+    def __init__(self, *,
+                 bind: AbstractAddress = None,
+                 serializer: Callable = None,
+                 transport: Type[BaseTransport] = None,
+                 authenticator: AbstractAuthenticator = None,
+                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
+                 max_concurrency: int = 100):
+        if bind is None:
+            raise ValueError('You must specify the bind address.')
+        self._bind = bind
+        if transport is None:
+            raise ValueError('You must provide a transport class.')
+        self._transport = transport(authenticator=authenticator)
+
+    async def push(self, message):
+        pass
+
+
+class Subscriber:
+    '''
+    Represents a unidirectional message subscriber.
+    '''
+
+    def __init__(self, *,
+                 connect: AbstractAddress = None,
+                 serializer: Callable = None,
+                 transport: Type[BaseTransport] = None,
+                 authenticator: AbstractAuthenticator = None,
+                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
+                 max_concurrency: int = 100):
+        if connect is None:
+            raise ValueError('You must specify the bind address.')
+        self._connect = connect
+        if transport is None:
+            raise ValueError('You must provide a transport class.')
+        self._transport = transport(authenticator=authenticator)
+
+    async def fetch(self, message):
+        pass
+
+
 class Peer:
     '''
-    Represents the connection peer.
+    Represents a bidirectional connection where both sides can invoke each
+    other.
 
     In Callosum, there is no fixed server or client for a connection.
     Once the connection is established, each peer can become both
@@ -61,11 +111,11 @@ class Peer:
     '''
 
     def __init__(self, *,
-                 connect: str = None,
-                 bind: str = None,
+                 connect: AbstractAddress = None,
+                 bind: AbstractAddress = None,
                  serializer: Callable = None,
                  deserializer: Callable = None,
-                 transport_cls: Type[BaseTransport] = None,
+                 transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  scheduler: AbstractAsyncScheduler = None,
                  compress: bool = True,
@@ -75,7 +125,7 @@ class Peer:
                  invoke_timeout: float = None):
 
         if connect is None and bind is None:
-            raise ValueError('You must specify either connect or bind.')
+            raise ValueError('You must specify either the connect or bind address.')
         self._connect = connect
         self._bind = bind
         self._opener = None
@@ -88,9 +138,9 @@ class Peer:
         self._invoke_timeout = invoke_timeout
 
         self._scheduler = None
-        if transport_cls is None:
+        if transport is None:
             raise ValueError('You must provide a transport class.')
-        self._transport = transport_cls(authenticator=authenticator)
+        self._transport = transport(authenticator=authenticator)
         self._func_registry = {}
         self._stream_registry = {}
 
@@ -133,29 +183,30 @@ class Peer:
     async def _recv_loop(self):
         while True:
             try:
-                # TODO: flow-control in transports or peer queues?
-                raw_msg = await self._connection.recv_message()
-                msg = Message.decode(raw_msg, self._deserializer)
-                if msg.msgtype == MessageTypes.FUNCTION:
-                    self._function_requests.put_nowait(msg)
-                if msg.msgtype == MessageTypes.CANCEL:
-                    # TODO: implement cancellation
-                    pass
-                elif msg.msgtype == MessageTypes.STREAM:
-                    self._streaming_chunks.put_nowait(msg)
-                elif msg.msgtype == MessageTypes.RESULT:
-                    self._invocation_resolver.resolve(msg.request_id, msg)
+                async for raw_msg in self._connection.recv_message():
+                    # TODO: flow-control in transports or peer queues?
+                    if raw_msg is None:
+                        return
+                    msg = Message.decode(raw_msg, self._deserializer)
+                    if msg.msgtype == MessageTypes.FUNCTION:
+                        self._function_requests.put_nowait(msg)
+                    if msg.msgtype == MessageTypes.CANCEL:
+                        # TODO: implement cancellation
+                        pass
+                    elif msg.msgtype == MessageTypes.STREAM:
+                        self._streaming_chunks.put_nowait(msg)
+                    elif msg.msgtype == MessageTypes.RESULT:
+                        self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
 
     async def _send_loop(self):
         while True:
-            try:
-                msg = await self._outgoing_queue.get()
-                await self._connection.send_message(
-                    msg.encode(self._serializer))
-            except asyncio.CancelledError:
+            msg = await self._outgoing_queue.get()
+            if msg is sentinel:
                 break
+            await self._connection.send_message(
+                msg.encode(self._serializer))
 
     async def open(self):
         loop = current_loop()
@@ -172,17 +223,13 @@ class Peer:
         self._send_task = loop.create_task(self._send_loop())
 
     async def close(self):
-        opened = False
+        if self._send_task is not None:
+            await self._outgoing_queue.put(sentinel)
+            await self._send_task
         if self._recv_task is not None:
-            opened = True
+            await self._opener.__aexit__(None, None, None)
             self._recv_task.cancel()
             await self._recv_task
-        if self._send_task is not None:
-            opened = True
-            self._send_task.cancel()
-            await self._send_task
-        if opened:
-            await self._opener.__aexit__(None, None, None)
         if self._scheduler is not None:
             await self._scheduler.close()
         if self._transport is not None:

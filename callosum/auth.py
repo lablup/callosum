@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import abc
+from typing import Optional
 
 import attr
 import zmq
@@ -7,7 +10,7 @@ import zmq
 @attr.dataclass(frozen=True, slots=True)
 class AuthResult:
     success: bool
-    user_id: str = None
+    user_id: Optional[str] = None
 
 
 @attr.dataclass(frozen=True, slots=True)

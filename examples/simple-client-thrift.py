@@ -4,6 +4,7 @@ import random
 import secrets
 
 from callosum import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 from callosum.upper.thrift import ThriftClientAdaptor
 import thriftpy
 
@@ -14,7 +15,8 @@ simple_thrift = thriftpy.load(
 
 
 async def call():
-    peer = Peer(connect='tcp://localhost:5000',
+    peer = Peer(connect=ZeroMQAddress('tcp://localhost:5030'),
+                transport=ZeroMQTransport,
                 invoke_timeout=2.0)
     adaptor = ThriftClientAdaptor(simple_thrift.SimpleService)
     await peer.open()
@@ -36,8 +38,4 @@ async def call():
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(call())
-    finally:
-        loop.close()
+    asyncio.run(call())

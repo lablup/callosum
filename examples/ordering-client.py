@@ -2,10 +2,12 @@ import asyncio
 import json
 
 from callosum import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
 async def call():
-    peer = Peer(connect='tcp://localhost:5000',
+    peer = Peer(connect=ZeroMQAddress('tcp://localhost:5010'),
+                transport=ZeroMQTransport,
                 serializer=json.dumps,
                 deserializer=json.loads,
                 invoke_timeout=5.0)
