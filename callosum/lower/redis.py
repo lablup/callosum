@@ -91,17 +91,6 @@ class RedisStreamBinder(AbstractBinder):
         if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key, self.addr.group)  # TODO: mkstream=True in future aioredis
-        # if self.transport.authenticator:
-        #     server_id = await self.transport.authenticator.server_identity()
-        #     pull_sock.zap_domain = server_id.domain.encode('utf8')
-        #     pull_sock.setsockopt(zmq.CURVE_SERVER, 1)
-        #     pull_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
-        #     push_sock.zap_domain = server_id.domain.encode('utf8')
-        #     push_sock.setsockopt(zmq.CURVE_SERVER, 1)
-        #     push_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
-        # for key, value in self.transport._zsock_opts.items():
-        #     pull_sock.setsockopt(key, value)
-        #     push_sock.setsockopt(key, value)
         return RedisStreamConnection(self.transport, self.addr,
                                      ('bind', 'conn'))
 
@@ -139,22 +128,6 @@ class RedisStreamConnector(AbstractConnector):
         if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key, self.addr.group)  # TODO: mkstream=True in future aioredis
-        # if self.transport.authenticator:
-        #     auth = self.transport.authenticator
-        #     client_id = await auth.client_identity()
-        #     client_public_key = await auth.client_public_key()
-        #     server_public_key = await auth.server_public_key()
-        #     pull_sock.zap_domain = client_id.domain.encode('utf8')
-        #     pull_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
-        #     pull_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-        #     pull_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
-        #     push_sock.zap_domain = client_id.domain.encode('utf8')
-        #     push_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
-        #     push_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-        #     push_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
-        # for key, value in self.transport._zsock_opts.items():
-        #     pull_sock.setsockopt(key, value)
-        #     push_sock.setsockopt(key, value)
         return RedisStreamConnection(self.transport, self.addr,
                                      ('conn', 'bind'))
 
