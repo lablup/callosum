@@ -17,6 +17,24 @@ class AbstractMessagingMixin(metaclass=abc.ABCMeta):
     async def send_message(self, raw_msg: Tuple[bytes, bytes]) -> None:
         raise NotImplementedError
 
+class AbstractMessage(metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    @classmethod
+    def decode(self):
+        '''
+        Decodes the message and applies deserializer to the body.
+        Returns an instance of inheriting message class.
+        '''
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def encode(self) -> Tuple[bytes, bytes]:
+        '''
+        Encodes the message and applies serializer to body.
+        '''
+        raise NotImplementedError
+
 
 class AbstractAddress:
     pass
