@@ -12,17 +12,22 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
-from ..exceptions import ClientError
+from ..exceptions import ParamError
 # from ..auth import Identity
 # from ..compat import current_loop
 
 
 @attr.s(auto_attribs=True, slots=True)
 class RedisStreamAddress(AbstractAddress):
+    '''
+    Group and consumer are only required by receiver-side.
+    Thus they must not be specified for CommonStreamBinder.
+    '''
+
     redis_server: Union[str, Tuple[str, int]]
     stream_key: str
-    group: Optional[str] = None     # only required by receiver-side; must not be specified for CommonStreamBinder
-    consumer: Optional[str] = None  # only required by receiver-side; must not be specified for CommonStreamBinder
+    group: Optional[str] = None
+    consumer: Optional[str] = None
 
 
 class RedisStreamConnection(AbstractConnection):
@@ -84,8 +89,10 @@ class RedisStreamConnection(AbstractConnection):
 class CommonStreamBinder(AbstractBinder):
     '''
     CommonStreamBinder is for use with Publisher class.
-    All Publishers using CommonStreamBinder are supposed to provide the same stream key for the purposes
-    of subsequent message load-balancing among those, who read messages from the stream (Subscribers).
+    All Publishers using CommonStreamBinder are supposed
+    to provide the same stream key for the purposes
+    of subsequent message load-balancing among those,
+    who read messages from the stream (Subscribers).
     '''
 
     __slots__ = ('transport', 'addr')
@@ -98,14 +105,13 @@ class CommonStreamBinder(AbstractBinder):
             self.addr.redis_server,
             **self.transport._redis_opts)
         key = self.addr.stream_key
-        #If there were no stream with the specified key before, it is created as a side effect of adding the message.
+        # If there were no stream with the specified key before,
+        # it is created as a side effect of adding the message.
         await self.transport._redis.xadd(key, {b'meta': b'create-or-join-to-stream'})
         if self.addr.group:
-            raise ClientError("Group must not be specified in RedisStreamAddress, as objects\
-                using CommonStreamBinder are not supposed to be the consumers of any group.")
+            raise ParamError("group")
         if self.addr.consumer:
-            raise ClientError("Consumer must not be specified in RedisStreamAddress, as objects\
-                using CommonStreamBinder are not supposed to be the consumers of any group.")
+            raise ParamError("consumer")
         return RedisStreamConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
@@ -115,8 +121,10 @@ class CommonStreamBinder(AbstractBinder):
 class CommonStreamConnector(AbstractConnector):
     '''
     CommonStreamConnector is for ise with Subscriber class.
-    All Subscribers using CommonStreamConnector are supposed to provide the same stream key and same group name
-    for the purposes of subsequent load-balancing. Based on the consumer group name, RedisStream will make sure
+    All Subscribers using CommonStreamConnector are supposed
+    to provide the same stream key and same group name
+    for the purposes of subsequent load-balancing.
+    Based on the consumer group name, RedisStream will make sure
     that each subscriber from the group gets distinct set of messages.
     '''
 
@@ -131,7 +139,8 @@ class CommonStreamConnector(AbstractConnector):
             **self.transport._redis_opts)
         self.transport._redis = aioredis.Redis(pool)
         key = self.addr.stream_key
-        #If there were no stream with the specified key before, it is created as a side effect of adding the message.
+        # If there were no stream with the specified key before,
+        # it is created as a side effect of adding the message.
         await self.transport._redis.xadd(key, {b'meta': b'create-or-join-to-stream'})
         groups = await self.transport._redis.xinfo_groups(key)
         if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
