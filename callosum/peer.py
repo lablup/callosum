@@ -63,15 +63,21 @@ class Publisher:
                  bind: AbstractAddress = None,
                  serializer: Callable = None,
                  transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None,
-                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
-                 max_concurrency: int = 100):
+                 authenticator: AbstractAuthenticator = None):
         if bind is None:
             raise ValueError('You must specify the bind address.')
         self._bind = bind
+        self._opener = None
+        self._connection = None
+        self._serializer = _wrap_serializer(serializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator)
+
+        self._outgoing_queue = asyncio.Queue()
+        self._send_task = None
+
+        self._log = logging.getLogger(__name__ + '.Publisher')
 
     async def push(self, message):
         pass
@@ -84,17 +90,23 @@ class Subscriber:
 
     def __init__(self, *,
                  connect: AbstractAddress = None,
-                 serializer: Callable = None,
+                 deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None,
-                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
-                 max_concurrency: int = 100):
+                 authenticator: AbstractAuthenticator = None):
         if connect is None:
-            raise ValueError('You must specify the bind address.')
+            raise ValueError('You must specify the connect address.')
         self._connect = connect
+        self._opener = None
+        self._connection = None
+        self._deserializer = _wrap_deserializer(deserializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator)
+
+        self._incoming_queue = asyncio.Queue()
+        self._recv_task = None
+
+        self._log = logging.getLogger(__name__ + '.Subscriber')
 
     async def fetch(self, message):
         pass
