@@ -6,6 +6,10 @@ import attr
 import msgpack
 import snappy
 
+from . import (
+    AbstractMessage,
+)
+
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
 
@@ -92,7 +96,7 @@ metadata_types = (
 
 
 @attr.dataclass(frozen=True, slots=True)
-class Message:
+class Message(AbstractMessage):
     # header parts
     msgtype: MessageTypes
     method: str        # function/stream ID
@@ -122,7 +126,7 @@ class Message:
             MessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
-            mpackb(tuple(map(str, exc.args))),
+            Message.mpackb(tuple(map(str, exc.args))),
         )
 
     @classmethod
@@ -133,7 +137,7 @@ class Message:
             MessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, ''),
-            mpackb(list(map(str, exc_info[1].args))),
+            Message.mpackb(list(map(str, exc_info[1].args))),
         )
 
     @classmethod
@@ -146,13 +150,13 @@ class Message:
 
     @classmethod
     def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
-        header = munpackb(raw_msg[0])
+        header = Message.munpackb(raw_msg[0])
         msgtype = MessageTypes(header['type'])
         compressed = header['zip']
         raw_data: bytes = raw_msg[1]
         if compressed:
             raw_data = snappy.decompress(raw_data)
-        data = munpackb(raw_data)
+        data = Message.munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
         return cls(msgtype,
                    header['meth'],
@@ -173,7 +177,7 @@ class Message:
             'seq': self.seq_id,
             'zip': compress,
         }
-        serialized_header: bytes = mpackb(header)
+        serialized_header: bytes = Message.mpackb(header)
         if self.msgtype in (MessageTypes.FUNCTION, MessageTypes.RESULT):
             body = serializer(self.body)
         else:
@@ -182,7 +186,7 @@ class Message:
             'meta': metadata,
             'body': body,
         }
-        serialized_data: bytes = mpackb(data)
+        serialized_data: bytes = Message.mpackb(data)
         if compress:
             serialized_data = snappy.compress(serialized_data)
         return (serialized_header, serialized_data)
