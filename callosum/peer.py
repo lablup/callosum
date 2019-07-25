@@ -2,6 +2,7 @@ import asyncio
 import functools
 import logging
 from typing import Callable, Type
+from collections import defaultdict
 import secrets
 
 import aiojobs
@@ -104,6 +105,7 @@ class Subscriber:
         self._transport = transport(authenticator=authenticator)
 
         self._incoming_queue = asyncio.Queue()
+        self._handler_registry = defaultdict(list)
         self._recv_task = None
 
         self._log = logging.getLogger(__name__ + '.Subscriber')
