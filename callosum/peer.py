@@ -98,16 +98,23 @@ class Publisher:
         self._connection = await self._opener.__aenter__()
         self._send_task = loop.create_task(self._send_loop())
 
-    async def push(self, 
-                   event: EventTypes, 
-                   agent_id: str,
-                   timestamp: datetime = datetime.now(tzutc()),
-                   *args):
+    async def close(self):
+        if self._send_task is not None:
+            await self._outgoing_queue.put(sentinel)
+            await self._send_task
+        if self._transport is not None:
+            await self._transport.close()
+
+    def push(self, 
+             event: EventTypes, 
+             agent_id: str,
+             timestamp: datetime = datetime.now(tzutc()),
+             *args):
         msg = EventMessage.create(event,
                                   agent_id,
                                   timestamp, 
                                   *args)
-        await self._outgoing_queue.put(msg)
+        self._outgoing_queue.put_nowait(msg)
 
 
 class Subscriber:
