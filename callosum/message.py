@@ -96,7 +96,7 @@ metadata_types = (
 
 
 @attr.dataclass(frozen=True, slots=True)
-class Message(AbstractMessage):
+class RPCMessage(AbstractMessage):
     # header parts
     msgtype: MessageTypes
     method: str        # function/stream ID
@@ -126,7 +126,7 @@ class Message(AbstractMessage):
             MessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
-            Message.mpackb(tuple(map(str, exc.args))),
+            cls.mpackb(tuple(map(str, exc.args))),
         )
 
     @classmethod
@@ -137,7 +137,7 @@ class Message(AbstractMessage):
             MessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, ''),
-            Message.mpackb(list(map(str, exc_info[1].args))),
+            cls.mpackb(list(map(str, exc_info[1].args))),
         )
 
     @classmethod
@@ -150,13 +150,13 @@ class Message(AbstractMessage):
 
     @classmethod
     def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
-        header = Message.munpackb(raw_msg[0])
+        header = cls.munpackb(raw_msg[0])
         msgtype = MessageTypes(header['type'])
         compressed = header['zip']
         raw_data: bytes = raw_msg[1]
         if compressed:
             raw_data = snappy.decompress(raw_data)
-        data = Message.munpackb(raw_data)
+        data = cls.munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
         return cls(msgtype,
                    header['meth'],
@@ -177,7 +177,7 @@ class Message(AbstractMessage):
             'seq': self.seq_id,
             'zip': compress,
         }
-        serialized_header: bytes = Message.mpackb(header)
+        serialized_header: bytes = self.mpackb(header)
         if self.msgtype in (MessageTypes.FUNCTION, MessageTypes.RESULT):
             body = serializer(self.body)
         else:
@@ -186,7 +186,7 @@ class Message(AbstractMessage):
             'meta': metadata,
             'body': body,
         }
-        serialized_data: bytes = Message.mpackb(data)
+        serialized_data: bytes = self.mpackb(data)
         if compress:
             serialized_data = snappy.compress(serialized_data)
         return (serialized_header, serialized_data)

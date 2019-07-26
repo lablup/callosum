@@ -11,7 +11,7 @@ import attr
 from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
-from .message import Message, MessageTypes
+from .message import RPCMessage, MessageTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
@@ -187,7 +187,7 @@ class Peer:
                     # TODO: flow-control in transports or peer queues?
                     if raw_msg is None:
                         return
-                    msg = Message.decode(raw_msg, self._deserializer)
+                    msg = RPCMessage.decode(raw_msg, self._deserializer)
                     if msg.msgtype == MessageTypes.FUNCTION:
                         self._function_requests.put_nowait(msg)
                     if msg.msgtype == MessageTypes.CANCEL:
@@ -260,9 +260,9 @@ class Peer:
                     raise
                 except Exception as e:
                     self._log.error('Uncaught exception')
-                    response = Message.error(request, e)
+                    response = RPCMessage.error(request, e)
                 else:
-                    response = Message.result(request, result)
+                    response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
 
             loop.create_task(_func_task(request, handler))
@@ -283,7 +283,7 @@ class Peer:
                 if callable(body):
                     # The user is using an upper-layer adaptor.
                     agen = body()
-                    request = Message(
+                    request = RPCMessage(
                         MessageTypes.FUNCTION,
                         method,
                         order_key,
@@ -300,7 +300,7 @@ class Peer:
                     except StopAsyncIteration:
                         pass
                 else:
-                    request = Message(
+                    request = RPCMessage(
                         MessageTypes.FUNCTION,
                         method,
                         order_key,
@@ -322,7 +322,7 @@ class Peer:
                     raise ServerError(response.body)
                 return upper_result
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                cancel_request = Message.cancel(request)
+                cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
                 raise
             except Exception:
