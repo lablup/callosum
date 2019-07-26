@@ -3,6 +3,8 @@ import functools
 import logging
 from typing import Callable, Type
 from collections import defaultdict
+from datetime import datetime
+from dateutil.tz import tzutc
 import secrets
 
 import aiojobs
@@ -13,6 +15,7 @@ from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
 from .message import Message, MessageTypes
+from .eventmessage import EventMessage, EventTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
@@ -80,8 +83,31 @@ class Publisher:
 
         self._log = logging.getLogger(__name__ + '.Publisher')
 
-    async def push(self, message):
-        pass
+    async def _send_loop(self):
+        while True:
+            msg = await self._outgoing_queue.get()
+            if msg is sentinel:
+                break
+            await self._connection.send_message(
+                msg.encode(self._serializer))
+
+    async def open(self):
+        loop = current_loop()
+        self._opener = functools.partial(self._transport.bind,
+                                         self._bind)()
+        self._connection = await self._opener.__aenter__()
+        self._send_task = loop.create_task(self._send_loop())
+
+    async def push(self, 
+                   event: EventTypes, 
+                   agent_id: str,
+                   timestamp: datetime = datetime.now(tzutc()),
+                   *args):
+        msg = EventMessage.create(event,
+                                  agent_id,
+                                  timestamp, 
+                                  *args)
+        await self._outgoing_queue.put(msg)
 
 
 class Subscriber:
