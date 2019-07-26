@@ -8,15 +8,15 @@ from . import (
 )
 
 
-class EventTypes(enum.IntEnum):
-    INSTANCE_STARTED = 0
-    INSTANCE_TERMINATED = 1
-    INSTANCE_HEARTBEAT = 2
-    KERNEL_PREPARING = 3
-    KERNEL_CREATING = 4
-    KERNEL_PULLING = 5
-    KERNEL_STARTED = 6
-    KERNEL_TERMINATED = 7
+class EventTypes(enum.Enum):
+    INSTANCE_STARTED = "instance_started"
+    INSTANCE_TERMINATED = "instance_terminated"
+    INSTANCE_HEARTBEAT = "instance_heartbeat"
+    KERNEL_PREPARING = "kernel_preparing"
+    KERNEL_CREATING = "kernel_creating"
+    KERNEL_PULLING = "kernel_pulling"
+    KERNEL_STARTED = "kernel_started"
+    KERNEL_TERMINATED = "kernel_terminated"
 
 
 @attr.dataclass(frozen=True, slots=True)
