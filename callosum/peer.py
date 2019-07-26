@@ -143,8 +143,31 @@ class Subscriber:
 
         self._log = logging.getLogger(__name__ + '.Subscriber')
 
-    async def fetch(self, message):
-        pass
+    async def _recv_loop(self):
+        while True:
+            try:
+                async for raw_msg in self._connection.recv_message():
+                    if raw_msg is None:
+                        return
+                    msg = EventMessage.decode(raw_msg, self._deserializer)
+                    self._incoming_queue.put_nowait(msg)
+            except asyncio.CancelledError:
+                break
+
+    async def open(self):
+        loop = current_loop()
+        self._opener = functools.partial(self._transport.connect,
+                                         self._connect)()
+        self._connection = await self._opener.__aenter__()
+        self._recv_task = loop.create_task(self._recv_loop())
+
+    async def close(self):
+        if self._recv_task is not None:
+            await self._opener.__aexit__(None, None, None)
+            self._recv_task.cancel()
+            await self._recv_task
+        if self._transport is not None:
+            await self._transport.close()
 
 
 class Peer:
