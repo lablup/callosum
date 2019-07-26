@@ -14,8 +14,8 @@ import attr
 from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
-from .message import Message, MessageTypes
 from .eventmessage import EventMessage, EventTypes
+from .message import RPCMessage, RPCMessageTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
@@ -244,9 +244,9 @@ class Peer:
         del self._stream_registry[method]
 
     def _lookup(self, msgtype, method):
-        if msgtype == MessageTypes.FUNCTION:
+        if msgtype == RPCMessageTypes.FUNCTION:
             return self._func_registry[method]
-        elif msgtype == MessageTypes.STREAM:
+        elif msgtype == RPCMessageTypes.STREAM:
             return self._stream_registry[method]
         raise ValueError('Invalid msgtype')
 
@@ -257,15 +257,15 @@ class Peer:
                     # TODO: flow-control in transports or peer queues?
                     if raw_msg is None:
                         return
-                    msg = Message.decode(raw_msg, self._deserializer)
-                    if msg.msgtype == MessageTypes.FUNCTION:
+                    msg = RPCMessage.decode(raw_msg, self._deserializer)
+                    if msg.msgtype == RPCMessageTypes.FUNCTION:
                         self._function_requests.put_nowait(msg)
-                    if msg.msgtype == MessageTypes.CANCEL:
+                    if msg.msgtype == RPCMessageTypes.CANCEL:
                         # TODO: implement cancellation
                         pass
-                    elif msg.msgtype == MessageTypes.STREAM:
+                    elif msg.msgtype == RPCMessageTypes.STREAM:
                         self._streaming_chunks.put_nowait(msg)
-                    elif msg.msgtype == MessageTypes.RESULT:
+                    elif msg.msgtype == RPCMessageTypes.RESULT:
                         self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
@@ -330,9 +330,9 @@ class Peer:
                     raise
                 except Exception as e:
                     self._log.error('Uncaught exception')
-                    response = Message.error(request, e)
+                    response = RPCMessage.error(request, e)
                 else:
-                    response = Message.result(request, result)
+                    response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
 
             loop.create_task(_func_task(request, handler))
@@ -353,8 +353,8 @@ class Peer:
                 if callable(body):
                     # The user is using an upper-layer adaptor.
                     agen = body()
-                    request = Message(
-                        MessageTypes.FUNCTION,
+                    request = RPCMessage(
+                        RPCMessageTypes.FUNCTION,
                         method,
                         order_key,
                         self._seq_id,
@@ -370,8 +370,8 @@ class Peer:
                     except StopAsyncIteration:
                         pass
                 else:
-                    request = Message(
-                        MessageTypes.FUNCTION,
+                    request = RPCMessage(
+                        RPCMessageTypes.FUNCTION,
                         method,
                         order_key,
                         self._seq_id,
@@ -382,17 +382,17 @@ class Peer:
                     response = await self._invocation_resolver.wait(
                         request.request_id)
                     upper_result = response.body
-                if response.msgtype == MessageTypes.RESULT:
+                if response.msgtype == RPCMessageTypes.RESULT:
                     pass
-                elif response.msgtype == MessageTypes.FAILURE:
+                elif response.msgtype == RPCMessageTypes.FAILURE:
                     # TODO: encode/decode error info
                     raise HandlerError(response.body)
-                elif response.msgtype == MessageTypes.ERROR:
+                elif response.msgtype == RPCMessageTypes.ERROR:
                     # TODO: encode/decode error info
                     raise ServerError(response.body)
                 return upper_result
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                cancel_request = Message.cancel(request)
+                cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
                 raise
             except Exception:

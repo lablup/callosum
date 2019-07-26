@@ -45,12 +45,12 @@ class EventMessage(AbstractMessage):
 
     @classmethod
     def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
-        header = EventMessage.munpackb(raw_msg[0])
+        header = cls.munpackb(raw_msg[0])
         event = EventTypes(header['event'])
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp = datetime.datetime.strptime(header['timestamp'], fmt)
-        body = EventMessage.munpackb(raw_msg[1])
+        body = cls.munpackb(raw_msg[1])
         return cls(event,
                    header['agent_id'],
                    timestamp,
@@ -67,10 +67,10 @@ class EventMessage(AbstractMessage):
             'agent_id': self.agent_id,
             'timestamp': timestamp,
         }
-        serialized_header: bytes = EventMessage.mpackb(header)
+        serialized_header: bytes = self.mpackb(header)
         args = serializer(self.args)
         body = {
             'args': args,
         }
-        serialized_body: bytes = EventMessage.mpackb(body)
+        serialized_body: bytes = self.mpackb(body)
         return (serialized_header, serialized_body)

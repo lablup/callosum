@@ -2,11 +2,7 @@ class CallosumError(Exception):
     pass
 
 
-class ClientError(CallosumError):
-    pass
-
-
-class ParamError(ClientError):
+class ParamError(CallosumError, ValueError):
 
     def __init__(self, error_param: str):
         self.message =\
@@ -15,6 +11,10 @@ class ParamError(ClientError):
             as objects using CommonStreamBinder are not supposed
             to be the consumers of any group.
             '''
+
+
+class ClientError(CallosumError):
+    pass
 
 
 class ServerError(CallosumError):
