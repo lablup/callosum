@@ -76,7 +76,7 @@ class NullMetadata(Metadata):
     pass
 
 
-class MessageTypes(enum.IntEnum):
+class RPCMessageTypes(enum.IntEnum):
     FUNCTION = 0
     STREAM = 1
     RESULT = 2   # result of functions
@@ -98,7 +98,7 @@ metadata_types = (
 @attr.dataclass(frozen=True, slots=True)
 class RPCMessage(AbstractMessage):
     # header parts
-    msgtype: MessageTypes
+    msgtype: RPCMessageTypes
     method: str        # function/stream ID
     order_key: str  # replied back as-is
     seq_id: int      # replied back as-is
@@ -114,7 +114,7 @@ class RPCMessage(AbstractMessage):
     @classmethod
     def result(cls, request, result_body):
         return cls(
-            MessageTypes.RESULT,
+            RPCMessageTypes.RESULT,
             request.method, request.order_key, request.seq_id,
             ResultMetadata(),
             result_body,
@@ -123,7 +123,7 @@ class RPCMessage(AbstractMessage):
     @classmethod
     def failure(cls, request, exc):
         return cls(
-            MessageTypes.FAILURE,
+            RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
             cls.mpackb(tuple(map(str, exc.args))),
@@ -134,7 +134,7 @@ class RPCMessage(AbstractMessage):
         if exc_info is None:
             exc_info = sys.exc_info()
         return cls(
-            MessageTypes.ERROR,
+            RPCMessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, ''),
             cls.mpackb(list(map(str, exc_info[1].args))),
@@ -143,7 +143,7 @@ class RPCMessage(AbstractMessage):
     @classmethod
     def cancel(cls, request):
         return cls(
-            MessageTypes.CANCEL,
+            RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
             NullMetadata(), b'',
         )
@@ -151,7 +151,7 @@ class RPCMessage(AbstractMessage):
     @classmethod
     def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
         header = cls.munpackb(raw_msg[0])
-        msgtype = MessageTypes(header['type'])
+        msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
         raw_data: bytes = raw_msg[1]
         if compressed:
@@ -178,7 +178,7 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = self.mpackb(header)
-        if self.msgtype in (MessageTypes.FUNCTION, MessageTypes.RESULT):
+        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
             body = serializer(self.body)
         else:
             body = self.body
