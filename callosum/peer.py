@@ -1,7 +1,11 @@
 import asyncio
 import functools
 import logging
-from typing import Callable, Type
+from typing import (
+    Callable, Type,
+    Mapping, List,
+    Coroutine,
+)
 from collections import defaultdict
 from datetime import datetime
 from dateutil.tz import tzutc
@@ -105,14 +109,14 @@ class Publisher:
         if self._transport is not None:
             await self._transport.close()
 
-    def push(self, 
-             event: EventTypes, 
+    def push(self,
+             event: EventTypes,
              agent_id: str,
              timestamp: datetime = datetime.now(tzutc()),
              *args):
         msg = EventMessage.create(event,
                                   agent_id,
-                                  timestamp, 
+                                  timestamp,
                                   *args)
         self._outgoing_queue.put_nowait(msg)
 
@@ -138,7 +142,8 @@ class Subscriber:
         self._transport = transport(authenticator=authenticator)
 
         self._incoming_queue = asyncio.Queue()
-        self._handler_registry = defaultdict(list)
+        self._handler_registry: Mapping[EventTypes, List[Coroutine]]\
+             = defaultdict(list)
         self._recv_task = None
 
         self._log = logging.getLogger(__name__ + '.Subscriber')
@@ -168,6 +173,24 @@ class Subscriber:
             await self._recv_task
         if self._transport is not None:
             await self._transport.close()
+
+    async def listen(self):
+        '''
+        Fetch incoming messages and call appropriate
+        handler from "_handler_registry".
+        '''
+        loop = current_loop()
+        while True:
+            msg = await self._incoming_queue.get()
+            # _ represents timestamp
+            #later, when callbacks are customized to accept
+            # timestamps, I may add it as another argument
+            # to the handler
+            event, agent_id, _ = msg.header
+            args = msg.body
+            handler_list = self._handler_registry[event]
+            for handler in handler_list:
+                loop.create_task(handler()) #TODO: finish here.
 
 
 class Peer:
