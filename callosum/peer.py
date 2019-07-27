@@ -17,6 +17,7 @@ from .ordering import (
     KeySerializedAsyncScheduler,
 )
 from .lower import AbstractAddress, BaseTransport
+from .ordering import SEQ_BITS
 
 
 def _wrap_serializer(serializer):
@@ -276,7 +277,7 @@ class Peer:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
             order_key = secrets.token_hex(8)
-        self._seq_id += 1
+        self._seq_id = (self._seq_id + 1) % SEQ_BITS
         with timeout(invoke_timeout):
             try:
                 request = None
