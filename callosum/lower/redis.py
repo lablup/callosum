@@ -12,7 +12,7 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
-from ..exceptions import ParamError
+from ..exceptions import RedisAddressParamError
 # from ..auth import Identity
 # from ..compat import current_loop
 
@@ -109,9 +109,9 @@ class CommonStreamBinder(AbstractBinder):
         # it is created as a side effect of adding the message.
         await self.transport._redis.xadd(key, {b'meta': b'create-or-join-to-stream'})
         if self.addr.group:
-            raise ParamError("group")
+            raise RedisAddressParamError("group")
         if self.addr.consumer:
-            raise ParamError("consumer")
+            raise RedisAddressParamError("consumer")
         return RedisStreamConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):

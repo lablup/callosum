@@ -2,7 +2,7 @@ class CallosumError(Exception):
     pass
 
 
-class ParamError(CallosumError, ValueError):
+class RedisAddressParamError(CallosumError, ValueError):
 
     def __init__(self, error_param: str):
         self.message =\
