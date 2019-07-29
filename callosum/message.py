@@ -6,9 +6,7 @@ import attr
 import msgpack
 import snappy
 
-from . import (
-    AbstractMessage,
-)
+from .abc import AbstractMessage
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization

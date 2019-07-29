@@ -99,7 +99,7 @@ setup(
         'ci': ci_requires,
         'docs': docs_requires,
         'thrift': thrift_requires,
-        'zmq': zmq_requires,
+        'zeromq': zmq_requires,
         'redis': redis_requires,
     },
 )

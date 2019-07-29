@@ -11,6 +11,9 @@ from typing import Optional
 import attr
 
 from .compat import current_loop
+from .serial import serial_lt
+
+SEQ_BITS = 32
 
 
 def _resolve_future(request_id, fut, result, log):
@@ -73,9 +76,11 @@ class _SeqItem:
     seq: int
     ev: Optional[asyncio.Event] = None
 
-    # TODO: handle integer overflow
-    def __lt__(self, other): return self.seq < other.seq   # noqa
-    def __eq__(self, other): return self.seq == other.seq  # noqa
+    def __lt__(self, other):
+        return serial_lt(self.seq, other.seq, SEQ_BITS)
+
+    def __eq__(self, other):
+        return self.seq == other.seq
 
 
 class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
