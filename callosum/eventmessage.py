@@ -10,12 +10,6 @@ from . import (
 )
 
 
-@dataclass
-class EventHandler:
-    app: web.Application
-    callback: Callable
-
-
 class EventTypes(enum.Enum):
     INSTANCE_STARTED = "instance_started"
     INSTANCE_TERMINATED = "instance_terminated"
@@ -64,7 +58,7 @@ class EventMessage(AbstractMessage):
                    timestamp,
                    deserializer(body['args']))
 
-    def encode(self, serializer, compress: bool = True) \
+    def encode(self, serializer) \
               -> Tuple[bytes, bytes]:
         event = int(self.event)
         # format string assumes that datetime object includes timezone!
