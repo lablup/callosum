@@ -10,6 +10,12 @@ from . import (
 )
 
 
+@dataclass
+class EventHandler:
+    app: web.Application
+    callback: Callable
+
+
 class EventTypes(enum.Enum):
     INSTANCE_STARTED = "instance_started"
     INSTANCE_TERMINATED = "instance_terminated"
