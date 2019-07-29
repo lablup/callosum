@@ -4,7 +4,6 @@ import logging
 from typing import (
     Callable, Type,
     Mapping, List,
-    Coroutine,
 )
 from collections import defaultdict
 from datetime import datetime
@@ -12,13 +11,15 @@ from dateutil.tz import tzutc
 import secrets
 
 import aiojobs
+from aiohttp import web
+from aiojobs.aiohttp import get_scheduler_from_app
 from async_timeout import timeout
 import attr
 
 from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
-from .eventmessage import EventMessage, EventTypes
+from .eventmessage import EventMessage, EventTypes, EventHandler
 from .message import RPCMessage, RPCMessageTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
@@ -127,10 +128,15 @@ class Subscriber:
     '''
 
     def __init__(self, *,
+                 app: web.Application,
                  connect: AbstractAddress = None,
                  deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None):
+        if app is None:
+            raise ValueError('You must provide app within which\
+                you are launching the subscriber.')
+        self._root_app = app
         if connect is None:
             raise ValueError('You must specify the connect address.')
         self._connect = connect
@@ -142,11 +148,17 @@ class Subscriber:
         self._transport = transport(authenticator=authenticator)
 
         self._incoming_queue = asyncio.Queue()
-        self._handler_registry: Mapping[EventTypes, List[Coroutine]]\
+        self._handler_registry: Mapping[EventTypes, EventHandler]\
              = defaultdict(list)
         self._recv_task = None
 
         self._log = logging.getLogger(__name__ + '.Subscriber')
+
+    def add_handler(self, 
+                    event: EventTypes, 
+                    app: web.Application, 
+                    callback: Callable):
+        self._handler_registry[event].append(EventHandler(app, callback))
 
     async def _recv_loop(self):
         while True:
@@ -176,21 +188,26 @@ class Subscriber:
 
     async def listen(self):
         '''
-        Fetch incoming messages and call appropriate
-        handler from "_handler_registry".
+        Fetches incoming messages and call appropriate
+        handlers from "_handler_registry".
         '''
         loop = current_loop()
+        scheduler = get_scheduler_from_app(self._root_app)
         while True:
             msg = await self._incoming_queue.get()
-            # _ represents timestamp
-            #later, when callbacks are customized to accept
+            # _ stores timestamp value.
+            # Later, when callbacks are customized to accept
             # timestamps, I may add it as another argument
-            # to the handler
+            # to the handler.
             event, agent_id, _ = msg.header
             args = msg.body
-            handler_list = self._handler_registry[event]
-            for handler in handler_list:
-                loop.create_task(handler()) #TODO: finish here.
+            for handler in self._handler_registry[event]:
+                cb = handler.callback
+                if asyncio.iscoroutine(cb) or asyncio.iscoroutinefunction(cb):
+                    await scheduler.spawn(cb(handler.app, agent_id, *args))
+                else:
+                    cb = functools.partial(cb, handler.app, agent_id, *args)
+                    loop.call_soon(cb)
 
 
 class Peer:

@@ -1,11 +1,19 @@
 import enum
 import datetime
-from typing import Tuple
+from typing import Tuple, Callable
+from dataclasses import dataclass
 
 import attr
+from aiohttp import web
 from . import (
     AbstractMessage,
 )
+
+
+@dataclass
+class EventHandler:
+    app: web.Application
+    callback: Callable
 
 
 class EventTypes(enum.Enum):
