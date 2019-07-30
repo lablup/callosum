@@ -66,7 +66,7 @@ class EventMessage(AbstractMessage):
 
     def encode(self, serializer) \
               -> Tuple[bytes, bytes]:
-        event = int(self.event)
+        event = self.event.value
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp: str = self.timestamp.strftime(fmt)
