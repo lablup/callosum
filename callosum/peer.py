@@ -29,7 +29,14 @@ from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
 )
-from .lower import AbstractAddress, BaseTransport
+from .lower import (
+    AbstractAddress,
+    BaseTransport,
+)
+from .lower.redis import (
+    TransportType,
+    RedisStreamTransport,
+)
 from .ordering import SEQ_BITS
 
 
@@ -77,7 +84,8 @@ class Publisher:
                  bind: AbstractAddress = None,
                  serializer: Callable = None,
                  transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None):
+                 authenticator: AbstractAuthenticator = None,
+                 transport_type: TransportType = TransportType.COMMON_STREAM):
         if bind is None:
             raise ValueError('You must specify the bind address.')
         self._bind = bind
@@ -86,7 +94,12 @@ class Publisher:
         self._serializer = _wrap_serializer(serializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
-        self._transport = transport(authenticator=authenticator)
+        # transport_type only needs to be specified if RedisStreamTransport is used.
+        if transport == RedisStreamTransport:
+            self._transport = transport(authenticator=authenticator,
+                                        transport_type=transport_type)
+        else:
+            self._transport = transport(authenticator=authenticator)
 
         self._outgoing_queue = asyncio.Queue()
         self._send_task = None
@@ -140,6 +153,7 @@ class Subscriber:
                  deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
+                 transport_type: TransportType = TransportType.COMMON_STREAM,
                  scheduler=None,
                  max_concurrency: int = 100):
         if connect is None:
@@ -150,7 +164,12 @@ class Subscriber:
         self._deserializer = _wrap_deserializer(deserializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
-        self._transport = transport(authenticator=authenticator)
+        # transport_type only needs to be specified if RedisStreamTransport is used.
+        if transport == RedisStreamTransport:
+            self._transport = transport(authenticator=authenticator,
+                                        transport_type=transport_type)
+        else:
+            self._transport = transport(authenticator=authenticator)
         self._scheduler = scheduler
         self._max_concurrency = max_concurrency
 

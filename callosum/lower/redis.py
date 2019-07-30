@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from enum import Enum
 from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
 
 import aioredis
@@ -237,6 +238,24 @@ class RedisStreamConnector(AbstractConnector):
             _redis.close()
             await _redis.wait_closed()
 
+    
+class TransportType(Enum):
+    '''
+    Provides unidirectional binder and connector.
+    In this case, it is supposed that same stream key or
+    set of keys will always be provided to RedisStreamAddress
+    for the sake of load-balancing among the stream message
+    readers.
+    '''
+    COMMON_STREAM = "common_stream"
+    '''
+    Provides bidirectional binder and connector.
+    Its common use case is to utilize bidirectionality
+    for the sake of initiating RPC calls and
+    obtaining corresponding responses.
+    '''
+    REDIS_STREAM = "redis_stream"
+
 
 class RedisStreamTransport(BaseTransport):
 
@@ -247,18 +266,29 @@ class RedisStreamTransport(BaseTransport):
     __slots__ = BaseTransport.__slots__ + (
         '_redis_opts',
         '_redis',
+        'binder_cls',
+        'connector_cls',
     )
 
     _redis_opts: Mapping[str, Any]
     _redis: aioredis.RedisConnection
 
-    binder_cls = RedisStreamBinder
-    connector_cls = RedisStreamConnector
+    #binder_cls = RedisStreamBinder
+    #connector_cls = RedisStreamConnector
 
-    def __init__(self, authenticator, **kwargs):
+    def __init__(self,
+                 authenticator, 
+                 transport_type: TransportType = TransportType.REDIS_STREAM,
+                 **kwargs):
         self._redis_opts = kwargs.pop('redis_opts', {})
         super().__init__(authenticator, **kwargs)
         self._redis = None
+        if transport_type == TransportType.COMMON_STREAM:
+            self.binder_cls = CommonStreamBinder
+            self.connector_cls = CommonStreamConnector
+        elif transport_type == TransportType.REDIS_STREAM:
+            self.binder_cls = RedisStreamBinder
+            self.connector_cls = RedisStreamConnector
 
     async def close(self):
         if self._redis is not None and not self._redis.closed:
