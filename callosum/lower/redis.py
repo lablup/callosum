@@ -273,9 +273,6 @@ class RedisStreamTransport(BaseTransport):
     _redis_opts: Mapping[str, Any]
     _redis: aioredis.RedisConnection
 
-    #binder_cls = RedisStreamBinder
-    #connector_cls = RedisStreamConnector
-
     def __init__(self,
                  authenticator, 
                  transport_type: TransportType = TransportType.REDIS_STREAM,
