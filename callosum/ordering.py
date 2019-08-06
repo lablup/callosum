@@ -46,8 +46,8 @@ class AsyncResolver:
         return fut
 
     def cancel(self, request_id):
-        # TODO: implement
-        pass
+        if request_id in self._futures:
+            self._futures.pop(request_id)
 
     def resolve(self, request_id, result):
         fut = self._futures.pop(request_id, None)
@@ -125,6 +125,8 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
     async def cancel(self, request_id):
         # TODO: implement
+        # if in futures and already done, then just pass
+        # else, extract from pending tasks and then let it go так сказать
         pass
 
 

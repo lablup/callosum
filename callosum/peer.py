@@ -470,6 +470,7 @@ class Peer:
                     raise ServerError(response.body)
                 return upper_result
             except (asyncio.TimeoutError, asyncio.CancelledError):
+                self._invocation_resolver.cancel(request.request_id)
                 cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
                 raise
