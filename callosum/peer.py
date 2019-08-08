@@ -376,6 +376,7 @@ class Peer:
             await self._outgoing_queue.put(sentinel)
             await self._send_task
         if self._recv_task is not None:
+            # TODO: pass exception description, e.g. during invoke timeout
             await self._opener.__aexit__(None, None, None)
             self._recv_task.cancel()
             await self._recv_task
@@ -383,6 +384,8 @@ class Peer:
             await self._scheduler.close()
         if self._transport is not None:
             await self._transport.close()
+        # TODO: add proper cleanup for awaiting on
+        # finishing of the "listen" coroutine's spawned tasks
 
     async def listen(self):
         '''
@@ -412,6 +415,8 @@ class Peer:
                     self._log.error('Uncaught exception')
                     response = RPCMessage.error(request, e)
                 else:
+                    if 'cancelled' in result:
+                        return
                     response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
 
@@ -475,11 +480,11 @@ class Peer:
                 # send cancel_request to connected peer
                 cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
-                # cancel request within this peer
+
+                # cancel invocation within this peer
                 self._invocation_resolver.cancel(request.request_id)
-                # close the peer
+
                 await self.close()
-                #return {'received': 'WRONG', 'result': 'WRONG'}
                 raise
             except Exception:
                 raise

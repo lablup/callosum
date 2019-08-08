@@ -113,12 +113,16 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             _, okey, _ = rqst_id
             s.ev.set()
             fut = self.get_fut(rqst_id)
-            _resolve_future(rqst_id, fut, task.result(), self._log)
+            if task.cancelled():
+                result = {'cancelled': True}
+                _resolve_future(rqst_id, fut, result, self._log)
+            else:
+                _resolve_future(rqst_id, fut, task.result(), self._log)
+                heapq.heappop(self._pending[okey])
             self.remove_if_empty(okey)
 
         job._task.add_done_callback(functools.partial(cb, s, request_id))
         await job.wait()
-        heapq.heappop(self._pending[okey])
 
     def get_fut(self, request_id) -> asyncio.Future:
         return self._futures[request_id]
@@ -131,29 +135,25 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     async def cancel(self, request_id):
         method, okey, seq = request_id
         if request_id in self._futures:
-            print("Start job on task cancellation")
-            still_pending = False
             if self._pending[okey]:
                 pending_items = self._pending[okey]
                 for seq_item in pending_items:
                     if seq_item.method == method and seq_item.seq == seq:
                         pending_items.remove(seq_item)
-                        still_pending = True
-                        print("The task is deleted from pending")
                         self.remove_if_empty(okey)
-            if not still_pending: #it means job has already been spawned
-                # NOTE: Idk what happens with wrapped asyncio.Task when aiojobs.Job gets closed.
-                job = self._jobs[request_id]
-                job._task.cancel()
+            job = self._jobs.get(request_id, None)
+            if job:
+                try:
+                    job._task.cancel()
+                except:
+                    # the handler has to reraise CancelledError
+                    # to be registered as cancelled.
+                    pass
                 await job._task
-                print("The task is awaited")
                 await job.close()
-                print("The job is closed")
-            fut = self.get_fut(request_id)
-            result = {'cancelled': True}
-            _resolve_future(request_id, fut, result, self._log)
         else:
-            self._log.warning('cancellation of unknown or not sent yet request: %r', request_id)
+            self._log.warning('cancellation of unknown or \
+                               not sent yet request: %r', request_id)
 
     def remove_if_empty(self, okey):
         if len(self._pending[okey]) == 0:
