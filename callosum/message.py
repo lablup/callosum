@@ -143,7 +143,7 @@ class RPCMessage(AbstractMessage):
         return cls(
             RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
-            NullMetadata(), b'',
+            NullMetadata(), {},
         )
 
     @classmethod
@@ -176,7 +176,7 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = self.mpackb(header)
-        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
+        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT, RPCMessageTypes.CANCEL):
             body = serializer(self.body)
         else:
             body = self.body
