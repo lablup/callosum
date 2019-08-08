@@ -80,7 +80,7 @@ class RPCMessageTypes(enum.IntEnum):
     RESULT = 2   # result of functions
     FAILURE = 3  # error from user handlers
     ERROR = 4    # error from callosum or underlying libraries
-    CANCEL = 5   # client-side timeout/cancel
+    CANCEL = 5   # client-side timeout or cancel request
 
 
 metadata_types = (
