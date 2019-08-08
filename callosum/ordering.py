@@ -61,7 +61,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def wait(self, request_id):
+    async def get_fut(self, request_id):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -90,6 +90,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     def __init__(self):
         self._log = logging.getLogger(__name__ + '.KeySerializedAsyncScheduler')
         self._futures = {}
+        self._jobs = {}
         self._pending = defaultdict(list)
 
     async def schedule(self, request_id, scheduler, coro):
@@ -107,27 +108,50 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             heapq.heappop(self._pending[okey])
 
         job = await scheduler.spawn(coro)
+        self._jobs[request_id] = job
 
         def cb(s, rqst_id, task):
             _, okey, _ = rqst_id
             s.ev.set()
-            fut = self._futures[rqst_id]
+            fut = self.get_fut(rqst_id)
             _resolve_future(rqst_id, fut, task.result(), self._log)
-            if len(self._pending[okey]) == 0:
-                # TODO: check if pending is cleared
-                del self._pending[okey]
+            self.remove_from_pending(okey)
 
         job._task.add_done_callback(functools.partial(cb, s, request_id))
         await job.wait()
 
-    def wait(self, request_id) -> asyncio.Future:
-        return self._futures.pop(request_id)
+    def get_fut(self, request_id) -> asyncio.Future:
+        return self._futures[request_id]
+
+    def cleanup(self, request_id):
+        self._futures.pop(request_id)
+        if request_id in self._jobs:
+            self._jobs.pop(request_id)
 
     async def cancel(self, request_id):
-        # TODO: implement
-        # if in futures and already done, then just pass
-        # else, extract from pending tasks and then let it go так сказать
-        pass
+        method, okey, seq = request_id
+        if request_id in self._futures:
+            still_pending = False
+            if self._pending[okey]:
+                pending_items = self._pending[okey]
+                for seq_item in pending_items:
+                    if seq_item.method == method and seq_item.seq == seq:
+                        pending_items.remove(seq_item)
+                        still_pending = True
+                        self.remove_from_pending(okey)
+            if not still_pending: #it means job has already been spawned
+                # NOTE: Idk what happens with wrapped asyncio.Task when aiojobs.Job gets closed.
+                await self._jobs[request_id].close()
+            fut = self.get_fut(request_id)
+            result = {'cancelled': True}
+            _resolve_future(request_id, fut, result, self._log)
+        else:
+            self._log.warning('cancellation of unknown or not sent yet request: %r', request_id)
+
+    def remove_from_pending(self, okey):
+        if len(self._pending[okey]) == 0:
+            # TODO: check if pending is cleared
+            del self._pending[okey]
 
 
 class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
@@ -148,7 +172,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
 
         job._task.add_done_callback(cb)
 
-    def wait(self, request_id) -> asyncio.Future:
+    def get_fut(self, request_id) -> asyncio.Future:
         if request_id in self._futures:
             raise RuntimeError('duplicate request: %r', request_id)
 

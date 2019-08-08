@@ -338,9 +338,8 @@ class Peer:
                     msg = RPCMessage.decode(raw_msg, self._deserializer)
                     if msg.msgtype == RPCMessageTypes.FUNCTION:
                         self._function_requests.put_nowait(msg)
-                    if msg.msgtype == RPCMessageTypes.CANCEL:
-                        # TODO: implement cancellation
-                        pass
+                    elif msg.msgtype == RPCMessageTypes.CANCEL:
+                        await self._func_scheduler.cancel(msg.request_id)
                     elif msg.msgtype == RPCMessageTypes.STREAM:
                         self._streaming_chunks.put_nowait(msg)
                     elif msg.msgtype == RPCMessageTypes.RESULT:
@@ -367,8 +366,10 @@ class Peer:
         else:
             raise RuntimeError('Misconfigured opener')
         self._connection = await self._opener.__aenter__()
-        self._recv_task = loop.create_task(self._recv_loop())
+        # NOTE: if we change the order of the following 2 lines of code,
+        # then there will be error after "flushall" redis.
         self._send_task = loop.create_task(self._send_loop())
+        self._recv_task = loop.create_task(self._recv_loop())
 
     async def close(self):
         if self._send_task is not None:
@@ -403,7 +404,8 @@ class Peer:
                         rqst_id,
                         self._scheduler,
                         handler(request))
-                    result = await self._func_scheduler.wait(rqst_id)
+                    result = await self._func_scheduler.get_fut(rqst_id)
+                    self._func_scheduler.cleanup(rqst_id)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     raise
                 except Exception as e:
@@ -470,9 +472,14 @@ class Peer:
                     raise ServerError(response.body)
                 return upper_result
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                self._invocation_resolver.cancel(request.request_id)
+                # send cancel_request to connected peer
                 cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
+                # cancel request within this peer
+                self._invocation_resolver.cancel(request.request_id)
+                # close the peer
+                await self.close()
+                #return {'received': 'WRONG', 'result': 'WRONG'}
                 raise
             except Exception:
                 raise
