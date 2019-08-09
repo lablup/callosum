@@ -58,34 +58,23 @@ class RedisStreamConnection(AbstractConnection):
         async def _xack(raw_msg):
             await self.transport._redis.xack(
                 raw_msg[0], self.addr.group, raw_msg[1])
-
-        # NOTE: I think using "while True" loop will make it safer in comparison to previous code.
-        # Please, review it, @achimnol
-        async def xread_group_msg() -> AsyncGenerator[Optional[Tuple[bytes, bytes]], None]:
-            while True:
-                try:
-                    raw_msgs = await _s(self.transport._redis.xread_group(
-                        self.addr.group,
-                        self.addr.consumer,
-                        [stream_key],
-                        latest_ids=['>']))
-                    for raw_msg in raw_msgs:
-                        yield raw_msg
-                        await _s(_xack(raw_msg))
-                except aioredis.errors.ConnectionForcedCloseError:
-                    yield None        
-
         try:
-            async for raw_msg in xread_group_msg():
+            raw_msgs = await _s(self.transport._redis.xread_group(
+                self.addr.group,
+                self.addr.consumer,
+                [stream_key],
+                latest_ids=['>']))
+            for raw_msg in raw_msgs:
                 # [0]: stream key, [1]: item ID
-                if raw_msg == None:
-                    yield None
-                elif b'meta' in raw_msg[2]:
-                    print(f'acknowledging meta message from {stream_key}')
+                if b'meta' in raw_msg[2]:
+                    await _s(_xack(raw_msg))
                     continue
                 yield raw_msg[2][b'hdr'], raw_msg[2][b'msg']
+                await _s(_xack(raw_msg))
         except asyncio.CancelledError:
             raise
+        except aioredis.errors.ConnectionForcedCloseError:
+            yield None
 
     async def send_message(self, raw_msg: Tuple[bytes, bytes]) -> None:
         # assert not self.transport._redis.closed
