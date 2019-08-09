@@ -12,6 +12,12 @@ from .peer import (
     Subscriber,
     Peer,
 )
+from .exceptions import (
+    CallosumError,
+    RedisAddressParamError,
+    ClientError,
+    HandlerError,
+)
 
 __all__ = (
     'Publisher',
@@ -23,6 +29,10 @@ __all__ = (
     'EventMessage',
     'EventTypes',
     'EventHandler',
+    'CallosumError',
+    'RedisAddressParamError',
+    'ClientError',
+    'HandlerError',
 )
 
 __version__ = '0.0.1'
