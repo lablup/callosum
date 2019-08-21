@@ -2,15 +2,18 @@ class CallosumError(Exception):
     pass
 
 
-class RedisAddressParamError(CallosumError, ValueError):
+class InvalidAddressError(CallosumError, ValueError):
 
-    def __init__(self, error_param: str):
-        self.message =\
-            f'''
-            {error_param} must not be specified in RedisStreamAddress,
-            as objects using CommonStreamBinder are not supposed
-            to be the consumers of any group.
-            '''
+    def __init__(self, invalid_param: str = None):
+        if invalid_param:
+            self.message =\
+                f'''
+                {invalid_param} either must not be specified
+                or is invalid.
+                '''
+        else:
+            self.message =\
+                "An invalid address was specified."
 
 
 class ClientError(CallosumError):
