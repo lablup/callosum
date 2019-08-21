@@ -85,7 +85,6 @@ class RedisStreamConnection(AbstractConnection):
         _s = asyncio.shield
         await _s(self.transport._redis.xadd(
             stream_key, {b'hdr': raw_msg[0], b'msg': raw_msg[1]}))
-        print(f"Message has been sent successfully")
 
 
 class CommonStreamBinder(AbstractBinder):
