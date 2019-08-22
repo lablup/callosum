@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from enum import Enum
 from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
 
 import aioredis
@@ -31,15 +30,15 @@ class RedisStreamAddress(AbstractAddress):
     consumer: Optional[str] = None
 
 
-class RedisStreamConnection(AbstractConnection):
+class DistributeRedisConnection(AbstractConnection):
 
     __slots__ = ('transport', )
 
-    transport: RedisStreamTransport
+    transport: DistributeRedisTransport
     addr: RedisStreamAddress
     direction_keys: Tuple[str, str]
 
-    def __init__(self, transport: RedisStreamTransport,
+    def __init__(self, transport: DistributeRedisTransport,
                  addr: RedisStreamAddress,
                  direction_keys: Optional[Tuple[str, str]] = None):
         self.transport = transport
@@ -87,10 +86,10 @@ class RedisStreamConnection(AbstractConnection):
             stream_key, {b'hdr': raw_msg[0], b'msg': raw_msg[1]}))
 
 
-class CommonStreamBinder(AbstractBinder):
+class DistributeRedisBinder(AbstractBinder):
     '''
-    CommonStreamBinder is for use with Publisher class.
-    All Publishers using CommonStreamBinder are supposed
+    DistributeRedisBinder is for use with Publisher class.
+    All Publishers using DistributeRedisBinder are supposed
     to provide the same stream key for the purposes
     of subsequent message load-balancing among those,
     who read messages from the stream (Subscribers).
@@ -98,7 +97,7 @@ class CommonStreamBinder(AbstractBinder):
 
     __slots__ = ('transport', 'addr')
 
-    transport: RedisStreamTransport
+    transport: DistributeRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
@@ -113,16 +112,16 @@ class CommonStreamBinder(AbstractBinder):
             raise InvalidAddressError("group") # group must not be specified
         if self.addr.consumer:
             raise InvalidAddressError("consumer") # consumer must not be specified
-        return RedisStreamConnection(self.transport, self.addr)
+        return DistributeRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         pass
 
 
-class CommonStreamConnector(AbstractConnector):
+class DistributeRedisConnector(AbstractConnector):
     '''
-    CommonStreamConnector is for ise with Subscriber class.
-    All Subscribers using CommonStreamConnector are supposed
+    DistributeRedisConnector is for ise with Subscriber class.
+    All Subscribers using DistributeRedisConnector are supposed
     to provide the same stream key and same group name
     for the purposes of subsequent load-balancing.
     Based on the consumer group name, RedisStream will make sure
@@ -131,7 +130,7 @@ class CommonStreamConnector(AbstractConnector):
 
     __slots__ = ('transport', 'addr')
 
-    transport: RedisStreamTransport
+    transport: DistributeRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
@@ -147,7 +146,7 @@ class CommonStreamConnector(AbstractConnector):
         if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key, self.addr.group)
-        return RedisStreamConnection(self.transport, self.addr)
+        return DistributeRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         # we need to create a new Redis connection for cleanup
@@ -166,126 +165,29 @@ class CommonStreamConnector(AbstractConnector):
             await _redis.wait_closed()
 
 
-class RedisStreamBinder(AbstractBinder):
-
-    __slots__ = ('transport', 'addr')
-
-    transport: RedisStreamTransport
-    addr: RedisStreamAddress
-
-    async def __aenter__(self):
-        self.transport._redis = await aioredis.create_redis(
-            self.addr.redis_server,
-            **self.transport._redis_opts)
-        key = f'{self.addr.stream_key}.bind'
-        await self.transport._redis.xadd(key, {b'meta': b'create-stream'})
-        groups = await self.transport._redis.xinfo_groups(key)
-        if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
-            await self.transport._redis.xgroup_create(
-                key, self.addr.group)  # TODO: mkstream=True in future aioredis
-        return RedisStreamConnection(self.transport, self.addr,
-                                     ('bind', 'conn'))
-
-    async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        # we need to create a new Redis connection for cleanup
-        # because self.transport._redis gets corrupted upon
-        # cancellation of Peer._recv_loop() task.
-        _redis = await aioredis.create_redis(
-            self.addr.redis_server,
-            **self.transport._redis_opts)
-        try:
-            await asyncio.shield(_redis.xgroup_delconsumer(
-                f'{self.addr.stream_key}.bind',
-                self.addr.group, self.addr.consumer))
-        finally:
-            _redis.close()
-            await _redis.wait_closed()
-
-
-class RedisStreamConnector(AbstractConnector):
-
-    __slots__ = ('transport', 'addr')
-
-    transport: RedisStreamTransport
-    addr: RedisStreamAddress
-
-    async def __aenter__(self):
-        pool = await aioredis.create_connection(
-            self.addr.redis_server,
-            **self.transport._redis_opts)
-        self.transport._redis = aioredis.Redis(pool)
-        key = f'{self.addr.stream_key}.conn'
-        await self.transport._redis.xadd(key, {b'meta': b'create-stream'})
-        groups = await self.transport._redis.xinfo_groups(key)
-        if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
-            await self.transport._redis.xgroup_create(
-                key, self.addr.group)  # TODO: mkstream=True in future aioredis
-        return RedisStreamConnection(self.transport, self.addr,
-                                     ('conn', 'bind'))
-
-    async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        # we need to create a new Redis connection for cleanup
-        # because self.transport._redis gets corrupted upon
-        # cancellation of Peer._recv_loop() task.
-        _redis = await aioredis.create_redis(
-            self.addr.redis_server,
-            **self.transport._redis_opts)
-        try:
-            await asyncio.shield(_redis.xgroup_delconsumer(
-                f'{self.addr.stream_key}.conn',
-                self.addr.group, self.addr.consumer))
-        finally:
-            _redis.close()
-            await _redis.wait_closed()
-
-    
-class TransportType(Enum):
-    '''
-    Provides unidirectional binder and connector.
-    In this case, it is supposed that same stream key or
-    set of keys will always be provided to RedisStreamAddress
-    for the sake of load-balancing among the stream message
-    readers.
-    '''
-    COMMON_STREAM = "common_stream"
-    '''
-    Provides bidirectional binder and connector.
-    Its common use case is to utilize bidirectionality
-    for the sake of initiating RPC calls and
-    obtaining corresponding responses.
-    '''
-    REDIS_STREAM = "redis_stream"
-
-
-class RedisStreamTransport(BaseTransport):
+class DistributeRedisTransport(BaseTransport):
 
     '''
-    Implementation for the transport backend by Redis Streams.
+    Implementation for unidirectional transport backend by Redis Streams.
     '''
 
     __slots__ = BaseTransport.__slots__ + (
         '_redis_opts',
         '_redis',
-        'binder_cls',
-        'connector_cls',
     )
 
     _redis_opts: Mapping[str, Any]
     _redis: aioredis.RedisConnection
 
+    binder_cls = DistributeRedisBinder
+    connector_cls = DistributeRedisConnector
+
     def __init__(self,
-                 authenticator, 
-                 transport_type: TransportType = TransportType.REDIS_STREAM,
+                 authenticator,
                  **kwargs):
         self._redis_opts = kwargs.pop('redis_opts', {})
         super().__init__(authenticator, **kwargs)
         self._redis = None
-        if transport_type == TransportType.COMMON_STREAM:
-            self.binder_cls = CommonStreamBinder
-            self.connector_cls = CommonStreamConnector
-        elif transport_type == TransportType.REDIS_STREAM:
-            self.binder_cls = RedisStreamBinder
-            self.connector_cls = RedisStreamConnector
 
     async def close(self):
         if self._redis is not None and not self._redis.closed:

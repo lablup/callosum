@@ -12,9 +12,9 @@ import json
 from callosum import (
     Subscriber,
 )
-from callosum.lower.redis import (
+from callosum.lower.distribute_redis import (
     RedisStreamAddress,
-    RedisStreamTransport,
+    DistributeRedisTransport,
 )
 
 
@@ -40,7 +40,7 @@ async def serve():
                       'redis://localhost:6379',
                       'events', 'subscriber-group', 'consumer1'),
                      deserializer=json.loads,
-                     transport=RedisStreamTransport)
+                     transport=DistributeRedisTransport)
     sub.add_handler(main_handler)
     try:
         await sub.open()

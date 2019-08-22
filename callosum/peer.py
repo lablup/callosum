@@ -25,17 +25,12 @@ from .pubsub_message import PubSubMessage
 from .rpc_message import RPCMessage, RPCMessageTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
-    KeySerializedAsyncScheduler,
+    KeySerializedAsyncScheduler, SEQ_BITS,
 )
 from .lower import (
     AbstractAddress,
     BaseTransport,
 )
-from .lower.redis import (
-    TransportType,
-    RedisStreamTransport,
-)
-from .ordering import SEQ_BITS
 
 
 def _wrap_serializer(serializer):
@@ -83,8 +78,7 @@ class Publisher:
                  serializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
-                 redis_opts: Mapping[str, Any] = {},
-                 transport_type: TransportType = TransportType.COMMON_STREAM):
+                 redis_opts: Mapping[str, Any] = {}):
         if bind is None:
             raise ValueError('You must specify the bind address.')
         self._bind = bind
@@ -93,13 +87,7 @@ class Publisher:
         self._serializer = _wrap_serializer(serializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
-        # transport_type only needs to be specified if RedisStreamTransport is used.
-        if transport == RedisStreamTransport:
-            self._transport = transport(authenticator=authenticator,
-                                        transport_type=transport_type,
-                                        redis_opts=redis_opts)
-        else:
-            self._transport = transport(authenticator=authenticator,
+        self._transport = transport(authenticator=authenticator,
                                         redis_opts=redis_opts)
 
         self._outgoing_queue = asyncio.Queue()
@@ -150,7 +138,6 @@ class Subscriber:
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  redis_opts: Mapping[str, Any] = {},
-                 transport_type: TransportType = TransportType.COMMON_STREAM,
                  scheduler=None,
                  max_concurrency: int = 100):
         if connect is None:
@@ -161,13 +148,7 @@ class Subscriber:
         self._deserializer = _wrap_deserializer(deserializer)
         if transport is None:
             raise ValueError('You must provide a transport class.')
-        # transport_type only needs to be specified if RedisStreamTransport is used.
-        if transport == RedisStreamTransport:
-            self._transport = transport(authenticator=authenticator,
-                                        transport_type=transport_type,
-                                        redis_opts=redis_opts)
-        else:
-            self._transport = transport(authenticator=authenticator,
+        self._transport = transport(authenticator=authenticator,
                                         redis_opts=redis_opts)
         self._scheduler = scheduler
         self._max_concurrency = max_concurrency

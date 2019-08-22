@@ -1,13 +1,18 @@
 import asyncio
 import json
+import time
 
 from callosum import Peer
-from callosum.lower.redis import (
-    RedisStreamAddress, RedisStreamTransport
+from callosum.lower.rpc_redis import (
+    RedisStreamAddress,
+    RPCRedisTransport,
 )
 
 
 async def handle_echo(request):
+    # NOTE: Adding this part with "await asyncio.sleep(1)" breaks the code.
+    time.sleep(1.0)
+    print("After sleeping")
     return {
         'received': request.body['sent'],
     }
@@ -21,9 +26,9 @@ async def handle_add(request):
 
 async def serve():
     peer = Peer(bind=RedisStreamAddress(
-                    'redis://localhost:16379',
+                    'redis://localhost:6379',
                     'myservice', 'server-group', 'client1'),
-                transport=RedisStreamTransport,
+                transport=RPCRedisTransport,
                 serializer=json.dumps,
                 deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
