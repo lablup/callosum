@@ -11,7 +11,6 @@ import json
 
 from callosum import (
     Subscriber,
-    EventTypes,
 )
 from callosum.lower.redis import (
     RedisStreamAddress,
@@ -19,31 +18,30 @@ from callosum.lower.redis import (
 )
 
 
-def handle_heartbeat(app: web.Application,
-                agent_id: str):
-    print(f"Heartbeat from agent {agent_id} received.")
+def handle_heartbeat(msg_body):
+    print(f"Heartbeat from agent {msg_body['agent_id']} received.")
 
-
-async def handle_add(app: web.Application,
-                     agent_id: str,
-                     addend1: int,
-                     addend2: int):
+async def handle_add(msg_body):
     await asyncio.sleep(2)
+    addend1, addend2 = msg_body['addends']
     sum = addend1 + addend2
     print(f"{addend1} + {addend2} = {sum}")
 
+async def main_handler(msg):
+    if msg.body['type'] == "instance_heartbeat":
+        handle_heartbeat(msg.body)
+    elif msg.body['type'] == "number_addition":
+        asyncio.create_task(handle_add(msg.body))
+    else:
+        print("InvalidMessageType: message of type EventTypes was expected.")
 
 async def serve():
     sub = Subscriber(connect=RedisStreamAddress(
                       'redis://localhost:6379',
                       'events', 'subscriber-group', 'consumer1'),
-                      deserializer=json.loads,
-                      transport=RedisStreamTransport)
-    app = web.Application
-    sub.add_handler(EventTypes.INSTANCE_HEARTBEAT, app, handle_heartbeat)
-    # handle_add is just random handler check and
-    # has no logical connection with INSTANCE_STARTED event.
-    sub.add_handler(EventTypes.INSTANCE_STARTED, app, handle_add)
+                     deserializer=json.loads,
+                     transport=RedisStreamTransport)
+    sub.add_handler(main_handler)
     try:
         await sub.open()
         print("listening task has started...")

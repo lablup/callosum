@@ -12,7 +12,6 @@ from dateutil.tz import tzutc
 
 from callosum import (
     Publisher,
-    EventTypes,
 )
 from callosum.lower.redis import (
     RedisStreamAddress,
@@ -32,18 +31,22 @@ async def call():
     async def heartbeats():
         for _ in range(10):
             await asyncio.sleep(1)
-            pub.push(EventTypes.INSTANCE_HEARTBEAT,
-                     agent_id,
+            msg_body = {
+                'type': "instance_heartbeat",
+                'agent_id': agent_id,
+            }
+            pub.push(msg_body,
                      datetime.now(tzutc()))
             print("pushed heartbeat")
 
     async def addition_event(addend1: int, addend2: int):
         await asyncio.sleep(3)
-        pub.push(EventTypes.INSTANCE_STARTED,
-                 agent_id,
-                 datetime.now(tzutc()),
-                 addend1,
-                 addend2)
+        msg_body = {
+            'type': "number_addition",
+            'addends': (addend1, addend2),
+        }
+        pub.push(msg_body,
+                 datetime.now(tzutc()))
         print("pushed addition event")
 
     task1 = asyncio.create_task(heartbeats())
