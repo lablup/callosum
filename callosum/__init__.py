@@ -1,11 +1,9 @@
 from .abc import AbstractMessage
-from .message import (
+from .rpc_message import (
     RPCMessage, RPCMessageTypes,
 )
-from .eventmessage import (
-    EventMessage,
-    EventTypes,
-    EventHandler,
+from .pubsub_message import (
+    PubSubMessage,
 )
 from .peer import (
     Publisher,
@@ -14,7 +12,7 @@ from .peer import (
 )
 from .exceptions import (
     CallosumError,
-    RedisAddressParamError,
+    InvalidAddressError,
     ClientError,
     HandlerError,
 )
@@ -26,11 +24,9 @@ __all__ = (
     'AbstractMessage',
     'RPCMessage',
     'RPCMessageTypes',
-    'EventMessage',
-    'EventTypes',
-    'EventHandler',
+    'PubSubMessage',
     'CallosumError',
-    'RedisAddressParamError',
+    'InvalidAddressError',
     'ClientError',
     'HandlerError',
 )

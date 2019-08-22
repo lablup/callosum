@@ -14,7 +14,7 @@ from . import (
 
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
-class EventMessage(AbstractMessage):
+class PubSubMessage(AbstractMessage):
     # header parts
     timestamp: datetime.datetime
 

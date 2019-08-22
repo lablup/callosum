@@ -6,6 +6,7 @@ from typing import (
     Mapping, List,
     Any,
 )
+from enum import Enum
 from collections import defaultdict
 from datetime import datetime
 from dateutil.tz import tzutc
@@ -20,12 +21,8 @@ import attr
 from .auth import AbstractAuthenticator
 from .compat import current_loop
 from .exceptions import ServerError, HandlerError
-from .eventmessage import (
-    EventMessage,
-    EventTypes,
-    EventHandler,
-)
-from .message import RPCMessage, RPCMessageTypes
+from .pubsub_message import PubSubMessage
+from .rpc_message import RPCMessage, RPCMessageTypes
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler,
@@ -133,14 +130,9 @@ class Publisher:
             await self._transport.close()
 
     def push(self,
-             event: EventTypes,
-             agent_id: str,
-             timestamp: datetime = datetime.now(tzutc()),
-             *args):
-        msg = EventMessage.create(event,
-                                  agent_id,
-                                  timestamp,
-                                  *args)
+             body,
+             timestamp: datetime = datetime.now(tzutc())):
+        msg = PubSubMessage.create(timestamp, body)
         self._outgoing_queue.put_nowait(msg)
 
 
@@ -181,17 +173,14 @@ class Subscriber:
         self._max_concurrency = max_concurrency
 
         self._incoming_queue = asyncio.Queue()
-        self._handler_registry: Mapping[EventTypes, List[EventHandler]]\
-             = defaultdict(list)
+        self._handler_registry: List[Callable] = []
         self._recv_task = None
 
         self._log = logging.getLogger(__name__ + '.Subscriber')
 
     def add_handler(self,
-                    event: EventTypes,
-                    app: web.Application,
                     callback: Callable):
-        self._handler_registry[event].append(EventHandler(app, callback))
+        self._handler_registry.append(callback)
 
     async def _recv_loop(self):
         while True:
@@ -199,7 +188,7 @@ class Subscriber:
                 async for raw_msg in self._connection.recv_message():
                     if raw_msg is None:
                         return
-                    msg = EventMessage.decode(raw_msg, self._deserializer)
+                    msg = PubSubMessage.decode(raw_msg, self._deserializer)
                     self._incoming_queue.put_nowait(msg)
             except asyncio.CancelledError:
                 break
@@ -231,19 +220,12 @@ class Subscriber:
         loop = current_loop()
         while True:
             msg = await self._incoming_queue.get()
-            # _ stores timestamp value.
-            # Later, when callbacks are customized to accept
-            # timestamps, I may add it as another argument
-            # to the handler.
-            event, agent_id, _ = msg.header
-            args = msg.body
-            for handler in self._handler_registry[event]:
-                cb = handler.callback
-                if asyncio.iscoroutine(cb) or asyncio.iscoroutinefunction(cb):
-                    await self._scheduler.spawn(cb(handler.app, agent_id, *args))
+            for handler in self._handler_registry:
+                if asyncio.iscoroutine(handler) or asyncio.iscoroutinefunction(handler):
+                    await self._scheduler.spawn(handler(msg))
                 else:
-                    cb = functools.partial(cb, handler.app, agent_id, *args)
-                    loop.call_soon(cb)
+                    handler = functools.partial(handler, msg)
+                    loop.call_soon(handler)
 
 
 class Peer:
