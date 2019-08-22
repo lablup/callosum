@@ -1,6 +1,8 @@
 import enum
 import datetime
-from typing import Tuple, Callable
+from typing import (
+    Tuple, Callable,
+)
 from dataclasses import dataclass
 
 import attr
@@ -27,7 +29,7 @@ class EventTypes(enum.Enum):
     KERNEL_TERMINATED = "kernel_terminated"
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class EventMessage(AbstractMessage):
     # header parts
     event: EventTypes

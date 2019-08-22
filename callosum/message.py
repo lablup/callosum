@@ -93,7 +93,7 @@ metadata_types = (
 )
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class RPCMessage(AbstractMessage):
     # header parts
     msgtype: RPCMessageTypes
