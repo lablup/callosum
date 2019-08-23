@@ -124,9 +124,9 @@ class Publisher:
         self._outgoing_queue.put_nowait(msg)
 
 
-class Subscriber:
+class Consumer:
     '''
-    Represents a unidirectional message subscriber.
+    Represents a unidirectional message consumer.
     If no scheduler is provided as a parameter,
     aiojobs scheduler with maximum concurrency
     of max_concurrency will be used.
@@ -157,7 +157,7 @@ class Subscriber:
         self._handler_registry: List[Callable] = []
         self._recv_task = None
 
-        self._log = logging.getLogger(__name__ + '.Subscriber')
+        self._log = logging.getLogger(__name__ + '.Consumer')
 
     def add_handler(self,
                     callback: Callable):

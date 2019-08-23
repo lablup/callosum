@@ -92,7 +92,7 @@ class DistributeRedisBinder(AbstractBinder):
     All Publishers using DistributeRedisBinder are supposed
     to provide the same stream key for the purposes
     of subsequent message load-balancing among those,
-    who read messages from the stream (Subscribers).
+    who read messages from the stream (Consumers).
     '''
 
     __slots__ = ('transport', 'addr')
@@ -120,11 +120,11 @@ class DistributeRedisBinder(AbstractBinder):
 
 class DistributeRedisConnector(AbstractConnector):
     '''
-    DistributeRedisConnector is for use with Subscriber class.
-    All Subscribers using DistributeRedisConnector are supposed
+    DistributeRedisConnector is for use with Consumer class.
+    All Consumers using DistributeRedisConnector are supposed
     to provide the same stream key and same group name
     for the purposes of subsequent load-balancing. Only the consumer
-    names can be different among Subscribers.
+    names can be different among Consumers.
     Based on the group name, RedisStream will make sure
     that each consumer from the group gets distinct set of messages.
     '''

@@ -7,7 +7,7 @@ from .pubsub_message import (
 )
 from .peer import (
     Publisher,
-    Subscriber,
+    Consumer,
     Peer,
 )
 from .exceptions import (
@@ -19,7 +19,7 @@ from .exceptions import (
 
 __all__ = (
     'Publisher',
-    'Subscriber',
+    'Consumer',
     'Peer',
     'AbstractMessage',
     'RPCMessage',

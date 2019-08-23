@@ -1,8 +1,8 @@
 '''
 During the testing, you are supposed to launch
-multiple subscribers. In this way, you can check
+multiple consumers. In this way, you can check
 whether messages are distributed among them and
-whether each subscriber gets only the messages
+whether each consumer gets only the messages
 which have not been obtained by others so far.
 '''
 import asyncio
@@ -10,7 +10,7 @@ from aiohttp import web
 import json
 
 from callosum import (
-    Subscriber,
+    Consumer,
 )
 from callosum.lower.distribute_redis import (
     RedisStreamAddress,
@@ -31,23 +31,23 @@ async def main_handler(msg):
     if msg.body['type'] == "instance_heartbeat":
         handle_heartbeat(msg.body)
     elif msg.body['type'] == "number_addition":
-        asyncio.create_task(handle_add(msg.body))
+        await handle_add(msg.body)
     else:
         print("InvalidMessageType: message of type EventTypes was expected.")
 
 async def serve():
-    sub = Subscriber(connect=RedisStreamAddress(
+    cons = Consumer(connect=RedisStreamAddress(
                       'redis://localhost:6379',
-                      'events', 'subscriber-group', 'consumer1'),
+                      'events', 'consumer-group', 'consumer1'),
                      deserializer=json.loads,
                      transport=DistributeRedisTransport)
-    sub.add_handler(main_handler)
+    cons.add_handler(main_handler)
     try:
-        await sub.open()
+        await cons.open()
         print("listening task has started...")
-        await sub.listen()
+        await cons.listen()
     except asyncio.CancelledError:
-        await sub.close()
+        await cons.close()
 
 
 if __name__ == '__main__':
