@@ -303,6 +303,8 @@ class Peer:
                     if msg.msgtype == RPCMessageTypes.FUNCTION:
                         self._function_requests.put_nowait(msg)
                     elif msg.msgtype == RPCMessageTypes.CANCEL:
+                        # TODO: change "await" to "create_task"
+                        # and take care of that task tracking/deleting/cancellation.
                         await self._func_scheduler.cancel(msg.request_id)
                     elif msg.msgtype == RPCMessageTypes.STREAM:
                         self._streaming_chunks.put_nowait(msg)

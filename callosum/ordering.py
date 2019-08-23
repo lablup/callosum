@@ -144,13 +144,13 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
                         self.remove_if_empty(okey)
             job = self._jobs.get(request_id, None)
             if job:
-                try:
-                    job._task.cancel()
-                except:
-                    # the handler has to reraise CancelledError
-                    # to be registered as cancelled.
-                    pass
-                await job._task
+                '''
+                According to source code, calling
+                "await job.close()" includes:
+                - "job._task.cancel()"
+                - "await job._task"
+                So everything is taken care of in one command.
+                '''
                 await job.close()
         else:
             self._log.warning('cancellation of unknown or \
