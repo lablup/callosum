@@ -30,15 +30,15 @@ class RedisStreamAddress(AbstractAddress):
     consumer: Optional[str] = None
 
 
-class DistributeRedisConnection(AbstractConnection):
+class DispatchRedisConnection(AbstractConnection):
 
     __slots__ = ('transport', )
 
-    transport: DistributeRedisTransport
+    transport: DispatchRedisTransport
     addr: RedisStreamAddress
     direction_keys: Tuple[str, str]
 
-    def __init__(self, transport: DistributeRedisTransport,
+    def __init__(self, transport: DispatchRedisTransport,
                  addr: RedisStreamAddress,
                  direction_keys: Optional[Tuple[str, str]] = None):
         self.transport = transport
@@ -86,10 +86,10 @@ class DistributeRedisConnection(AbstractConnection):
             stream_key, {b'hdr': raw_msg[0], b'msg': raw_msg[1]}))
 
 
-class DistributeRedisBinder(AbstractBinder):
+class DispatchRedisBinder(AbstractBinder):
     '''
-    DistributeRedisBinder is for use with Publisher class.
-    All Publishers using DistributeRedisBinder are supposed
+    DispatchRedisBinder is for use with Publisher class.
+    All Publishers using DispatchRedisBinder are supposed
     to provide the same stream key for the purposes
     of subsequent message load-balancing among those,
     who read messages from the stream (Consumers).
@@ -97,7 +97,7 @@ class DistributeRedisBinder(AbstractBinder):
 
     __slots__ = ('transport', 'addr')
 
-    transport: DistributeRedisTransport
+    transport: DispatchRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
@@ -112,16 +112,16 @@ class DistributeRedisBinder(AbstractBinder):
             raise InvalidAddressError("group") # group must not be specified
         if self.addr.consumer:
             raise InvalidAddressError("consumer") # consumer must not be specified
-        return DistributeRedisConnection(self.transport, self.addr)
+        return DispatchRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         pass
 
 
-class DistributeRedisConnector(AbstractConnector):
+class DispatchRedisConnector(AbstractConnector):
     '''
-    DistributeRedisConnector is for use with Consumer class.
-    All Consumers using DistributeRedisConnector are supposed
+    DispatchRedisConnector is for use with Consumer class.
+    All Consumers using DispatchRedisConnector are supposed
     to provide the same stream key and same group name
     for the purposes of subsequent load-balancing. Only the consumer
     names can be different among Consumers.
@@ -131,7 +131,7 @@ class DistributeRedisConnector(AbstractConnector):
 
     __slots__ = ('transport', 'addr')
 
-    transport: DistributeRedisTransport
+    transport: DispatchRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
@@ -147,7 +147,7 @@ class DistributeRedisConnector(AbstractConnector):
         if not any(map(lambda g: g[b'name'] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key, self.addr.group)
-        return DistributeRedisConnection(self.transport, self.addr)
+        return DispatchRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         # we need to create a new Redis connection for cleanup
@@ -166,7 +166,7 @@ class DistributeRedisConnector(AbstractConnector):
             await _redis.wait_closed()
 
 
-class DistributeRedisTransport(BaseTransport):
+class DispatchRedisTransport(BaseTransport):
 
     '''
     Implementation for unidirectional transport backend by Redis Streams.
@@ -180,8 +180,8 @@ class DistributeRedisTransport(BaseTransport):
     _redis_opts: Mapping[str, Any]
     _redis: aioredis.RedisConnection
 
-    binder_cls = DistributeRedisBinder
-    connector_cls = DistributeRedisConnector
+    binder_cls = DispatchRedisBinder
+    connector_cls = DispatchRedisConnector
 
     def __init__(self,
                  authenticator,

@@ -13,9 +13,9 @@ from dateutil.tz import tzutc
 from callosum import (
     Publisher,
 )
-from callosum.lower.distribute_redis import (
+from callosum.lower.dispatch_redis import (
     RedisStreamAddress,
-    DistributeRedisTransport,
+    DispatchRedisTransport,
 )
 
 
@@ -24,7 +24,7 @@ async def call():
                     'redis://localhost:6379',
                     'events'),
                     serializer=json.dumps,
-                    transport=DistributeRedisTransport)
+                    transport=DispatchRedisTransport)
     agent_id = secrets.token_hex(2) #publisher id
     await pub.open()
     
