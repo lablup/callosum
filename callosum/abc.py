@@ -3,6 +3,14 @@ from typing import Tuple
 import msgpack
 
 
+'''
+A sentinel object that can be used
+to represent cancellation during
+RPC requests of for other purposes.
+'''
+cancelled = object()
+
+
 class AbstractMessage(metaclass=abc.ABCMeta):
 
     @classmethod

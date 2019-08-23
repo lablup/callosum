@@ -23,6 +23,7 @@ from .compat import current_loop
 from .exceptions import ServerError, HandlerError
 from .pubsub_message import PubSubMessage
 from .rpc_message import RPCMessage, RPCMessageTypes
+from .abc import cancelled
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler, SEQ_BITS,
@@ -378,7 +379,7 @@ class Peer:
                     self._log.error('Uncaught exception')
                     response = RPCMessage.error(request, e)
                 else:
-                    if 'cancelled' in result:
+                    if result is cancelled:
                         return
                     response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
