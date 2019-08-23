@@ -78,7 +78,7 @@ class Publisher:
                  serializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
-                 redis_opts: Mapping[str, Any] = {}):
+                 transport_opts: Mapping[str, Any] = {}):
         if bind is None:
             raise ValueError('You must specify the bind address.')
         self._bind = bind
@@ -88,7 +88,7 @@ class Publisher:
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
-                                        redis_opts=redis_opts)
+                                        transport_opts=transport_opts)
 
         self._outgoing_queue = asyncio.Queue()
         self._send_task = None
@@ -137,7 +137,7 @@ class Subscriber:
                  deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
-                 redis_opts: Mapping[str, Any] = {},
+                 transport_opts: Mapping[str, Any] = {},
                  scheduler=None,
                  max_concurrency: int = 100):
         if connect is None:
@@ -149,7 +149,7 @@ class Subscriber:
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
-                                        redis_opts=redis_opts)
+                                        transport_opts=transport_opts)
         self._scheduler = scheduler
         self._max_concurrency = max_concurrency
 
@@ -226,7 +226,7 @@ class Peer:
                  deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
-                 redis_opts: Mapping[str, Any] = {},
+                 transport_opts: Mapping[str, Any] = {},
                  scheduler: AbstractAsyncScheduler = None,
                  compress: bool = True,
                  max_body_size: int = 10 * (2**20),  # 10 MiBytes
@@ -251,7 +251,7 @@ class Peer:
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
-                                    redis_opts=redis_opts)
+                                    transport_opts=transport_opts)
         self._func_registry = {}
         self._stream_registry = {}
 

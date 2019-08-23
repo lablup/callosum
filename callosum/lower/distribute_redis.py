@@ -186,7 +186,8 @@ class DistributeRedisTransport(BaseTransport):
     def __init__(self,
                  authenticator,
                  **kwargs):
-        self._redis_opts = kwargs.pop('redis_opts', {})
+        transport_opts = kwargs.pop('transport_opts', {})
+        self._redis_opts = transport_opts.get('redis_opts', {})
         super().__init__(authenticator, **kwargs)
         self._redis = None
 

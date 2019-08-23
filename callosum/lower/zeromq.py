@@ -238,9 +238,10 @@ class ZeroMQTransport(BaseTransport):
         loop = current_loop()
         self._zap_server = None
         self._zap_task = None
+        transport_opts = kwargs.pop('transport_opts', {})
         self._zsock_opts = {
             zmq.LINGER: 100,
-            **kwargs.pop('zsock_opts', {}),
+            **transport_opts.get('zsock_opts', {}),
         }
         super().__init__(authenticator, **kwargs)
         if self.authenticator:
