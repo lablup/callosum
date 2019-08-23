@@ -82,6 +82,14 @@ class RPCRedisConnection(AbstractConnection):
 
 
 class RPCRedisBinder(AbstractBinder):
+    '''
+    This class is binder for RPCRedisTransport.
+    Usually, the RPC server is supposed to provide
+    the connect address during Peer instantiation,
+    which will result in the Peer class using
+    the RPCRedisBinder for establishing 
+    the connection.
+    '''
 
     __slots__ = ('transport', 'addr')
 
@@ -118,6 +126,14 @@ class RPCRedisBinder(AbstractBinder):
 
 
 class RPCRedisConnector(AbstractConnector):
+    '''
+    This class is connector for RPCRedisTransport.
+    Usually, the RPC invoker (client) is supposed to provide
+    the connect address during Peer instantiation,
+    which will result in the Peer class using
+    the RPCRedisConnector for establishing 
+    the connection.
+    '''
 
     __slots__ = ('transport', 'addr')
 

@@ -120,12 +120,13 @@ class DistributeRedisBinder(AbstractBinder):
 
 class DistributeRedisConnector(AbstractConnector):
     '''
-    DistributeRedisConnector is for ise with Subscriber class.
+    DistributeRedisConnector is for use with Subscriber class.
     All Subscribers using DistributeRedisConnector are supposed
     to provide the same stream key and same group name
-    for the purposes of subsequent load-balancing.
-    Based on the consumer group name, RedisStream will make sure
-    that each subscriber from the group gets distinct set of messages.
+    for the purposes of subsequent load-balancing. Only the consumer
+    names can be different among Subscribers.
+    Based on the group name, RedisStream will make sure
+    that each consumer from the group gets distinct set of messages.
     '''
 
     __slots__ = ('transport', 'addr')
