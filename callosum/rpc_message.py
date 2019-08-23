@@ -80,7 +80,7 @@ class RPCMessageTypes(enum.IntEnum):
     RESULT = 2   # result of functions
     FAILURE = 3  # error from user handlers
     ERROR = 4    # error from callosum or underlying libraries
-    CANCEL = 5   # client-side timeout/cancel
+    CANCEL = 5   # client-side timeout or cancel request
 
 
 metadata_types = (
@@ -93,7 +93,7 @@ metadata_types = (
 )
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class RPCMessage(AbstractMessage):
     # header parts
     msgtype: RPCMessageTypes
@@ -143,7 +143,7 @@ class RPCMessage(AbstractMessage):
         return cls(
             RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
-            NullMetadata(), b'',
+            NullMetadata(), {},
         )
 
     @classmethod
@@ -176,7 +176,7 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = self.mpackb(header)
-        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
+        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT, RPCMessageTypes.CANCEL):
             body = serializer(self.body)
         else:
             body = self.body

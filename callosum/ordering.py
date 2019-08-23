@@ -12,6 +12,7 @@ import attr
 
 from .compat import current_loop
 from .serial import serial_lt
+from .abc import cancelled
 
 SEQ_BITS = 32
 
@@ -46,8 +47,8 @@ class AsyncResolver:
         return fut
 
     def cancel(self, request_id):
-        # TODO: implement
-        pass
+        if request_id in self._futures:
+            self._futures.pop(request_id)
 
     def resolve(self, request_id, result):
         fut = self._futures.pop(request_id, None)
@@ -61,7 +62,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def wait(self, request_id):
+    async def get_fut(self, request_id):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -90,6 +91,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     def __init__(self):
         self._log = logging.getLogger(__name__ + '.KeySerializedAsyncScheduler')
         self._futures = {}
+        self._jobs = {}
         self._pending = defaultdict(list)
 
     async def schedule(self, request_id, scheduler, coro):
@@ -104,28 +106,60 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             if s.seq == seq:
                 break
             await s.ev.wait()
-            heapq.heappop(self._pending[okey])
 
         job = await scheduler.spawn(coro)
+        self._jobs[request_id] = job
 
         def cb(s, rqst_id, task):
             _, okey, _ = rqst_id
             s.ev.set()
-            fut = self._futures[rqst_id]
-            _resolve_future(rqst_id, fut, task.result(), self._log)
-            if len(self._pending[okey]) == 0:
-                # TODO: check if pending is cleared
-                del self._pending[okey]
+            fut = self.get_fut(rqst_id)
+            if task.cancelled():
+                result = cancelled #sentinel object
+                _resolve_future(rqst_id, fut, result, self._log)
+            else:
+                _resolve_future(rqst_id, fut, task.result(), self._log)
+                heapq.heappop(self._pending[okey])
+            self.remove_if_empty(okey)
 
         job._task.add_done_callback(functools.partial(cb, s, request_id))
         await job.wait()
 
-    def wait(self, request_id) -> asyncio.Future:
-        return self._futures.pop(request_id)
+    def get_fut(self, request_id) -> asyncio.Future:
+        return self._futures[request_id]
+
+    def cleanup(self, request_id):
+        self._futures.pop(request_id)
+        if request_id in self._jobs:
+            self._jobs.pop(request_id)
 
     async def cancel(self, request_id):
-        # TODO: implement
-        pass
+        method, okey, seq = request_id
+        if request_id in self._futures:
+            if self._pending[okey]:
+                pending_items = self._pending[okey]
+                for seq_item in pending_items:
+                    if seq_item.method == method and seq_item.seq == seq:
+                        pending_items.remove(seq_item)
+                        self.remove_if_empty(okey)
+            job = self._jobs.get(request_id, None)
+            if job:
+                '''
+                According to source code, calling
+                "await job.close()" includes:
+                - "job._task.cancel()"
+                - "await job._task"
+                So everything is taken care of in one command.
+                '''
+                await job.close()
+        else:
+            self._log.warning('cancellation of unknown or \
+                               not sent yet request: %r', request_id)
+
+    def remove_if_empty(self, okey):
+        if len(self._pending[okey]) == 0:
+            # TODO: check if pending is cleared
+            del self._pending[okey]
 
 
 class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
@@ -146,7 +180,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
 
         job._task.add_done_callback(cb)
 
-    def wait(self, request_id) -> asyncio.Future:
+    def get_fut(self, request_id) -> asyncio.Future:
         if request_id in self._futures:
             raise RuntimeError('duplicate request: %r', request_id)
 

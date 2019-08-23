@@ -4,19 +4,20 @@ import random
 import secrets
 
 from callosum import Peer
-from callosum.lower.redis import (
-    RedisStreamAddress, RedisStreamTransport
+from callosum.lower.rpc_redis import (
+    RedisStreamAddress,
+    RPCRedisTransport,
 )
 
 
 async def call():
     peer = Peer(connect=RedisStreamAddress(
-                    'redis://localhost:16379',
+                    'redis://localhost:6379',
                     'myservice', 'client-group', 'server1'),
-                transport=RedisStreamTransport,
+                transport=RPCRedisTransport,
                 serializer=json.dumps,
                 deserializer=json.loads,
-                invoke_timeout=30.0)
+                invoke_timeout=3.0)
     await peer.open()
     response = await peer.invoke('echo', {
         'sent': secrets.token_hex(16),

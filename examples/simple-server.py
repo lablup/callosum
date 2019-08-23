@@ -5,6 +5,24 @@ from callosum import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
+# add the following handler when you want to test how
+# cancellation on invocation timeout works
+'''
+async def handle_echo(request):
+    try:
+        print("Before async sleep")
+        await asyncio.sleep(1000)
+        print("After async sleep")
+        return {
+            'received': request.body['sent'],
+        }
+    except asyncio.CancelledError:
+        print("Task was cancelled successfully")
+        # NOTE: due to strange behaviour of asyncio, I have to reraise
+        # otherwise, the task.cancelled() returns False
+        raise
+'''
+
 async def handle_echo(request):
     return {
         'received': request.body['sent'],
