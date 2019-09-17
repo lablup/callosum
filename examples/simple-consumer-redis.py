@@ -6,7 +6,6 @@ whether each consumer gets only the messages
 which have not been obtained by others so far.
 '''
 import asyncio
-from aiohttp import web
 import json
 
 from callosum import (
@@ -21,11 +20,13 @@ from callosum.lower.dispatch_redis import (
 def handle_heartbeat(msg_body):
     print(f"Heartbeat from agent {msg_body['agent_id']} received.")
 
+
 async def handle_add(msg_body):
     await asyncio.sleep(2)
     addend1, addend2 = msg_body['addends']
     sum = addend1 + addend2
     print(f"{addend1} + {addend2} = {sum}")
+
 
 async def main_handler(msg):
     if msg.body['type'] == "instance_heartbeat":
@@ -34,6 +35,7 @@ async def main_handler(msg):
         await handle_add(msg.body)
     else:
         print("InvalidMessageType: message of type EventTypes was expected.")
+
 
 async def serve():
     cons = Consumer(connect=RedisStreamAddress(

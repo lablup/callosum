@@ -25,9 +25,9 @@ async def call():
                     'events'),
                     serializer=json.dumps,
                     transport=DispatchRedisTransport)
-    agent_id = secrets.token_hex(2) #publisher id
+    agent_id = secrets.token_hex(2)  # publisher id
     await pub.open()
-    
+
     async def heartbeats():
         for _ in range(10):
             await asyncio.sleep(1)
