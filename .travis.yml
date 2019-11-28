@@ -2,11 +2,7 @@ language: python
 dist: xenial
 os:
   - linux
-before_cache:
-  - rm -f $HOME/.cache/pip/log/debug.log
-cache:
-  directories:
-    - $HOME/.cache/pip
+cache: pip
 addons:
   apt:
     packages:
@@ -19,31 +15,38 @@ stages:
 
 python:
   - "3.7"
+  - "3.8"
+
+install:
+  - pip install -U setuptools pip
+  - pip install -U -e ".[ci,zeromq,redis]"
+script:
+  - python -m mypy callosum
+  - python -m flake8 callosum tests
+  - python -m pytest tests
+after_success:
+  - codecov
 
 # stage def.
 jobs:
   include:
 
     - stage: test
-      install:
-        - pip install -U setuptools pip
-        - pip install -U -e ".[ci,zeromq,redis]"
-      script:
-        - python -m flake8
-        - python -m pytest
-      after_success:
-        - codecov
 
     - stage: deploy
-      python: "3.7"
+      python: "3.8"
       install: skip
       script: skip
       after_script: skip
       deploy:
         on:
           tags: true
-        provider: script
-        script: ./scripts/ci/deploy.sh
+        provider: pypi
+        distributions: sdist bdist_wheel
+        skip_upload_docs: true
+        user: __token__
+        password:
+          secure: "eh4SGUtBZn2yZEEBIAWyGntAb8AdBo1li5ZDxFdc7OQwtUvtT7SGjJNZx/qly3TQpN68WWb3kSO36UbRO08Z+2eSPEHkidpFvSxbzaUHj//Mq4tLV4wttsdP30i5+Bc7oA/lw/HVw8G8tsK/CO4SAGu5uQRzkuHBqSgteZzxOkshllDNgXZJ34EptX4t+a/wbIZjb1E5MuDYRv25Q8N+yqVLEF+H+cbAMrUQ45PuBFzHpMeAv61e5PTp7obS2z3BvShhCHSevAvR7PYlDn8tTLDOP0Av4rLgQe61EgunP1kux8lZ1vO9AHIbRJDe7aRWRBqFuJulPTTYSy4fjjD3P4r5Qblh+ZoaK7cF9qipaQ4zHcYAffvxj7ZRuVUzslZjK3OffD8uOfu+UZ3Xyx/iH51gdvPFA7plHuY0Z79YSnCPTK9D2bqzwQew9IfrPN/W2qMau6I7SBBFaQ/VlJ4GaQA6rJT5ddGU4kKLQ4qbuChVpZ03hEQs6eBRrbgxgsPT7OT1dPNQgnruDPmoFxs6P+5hnTYYG7h0UlBJdLYvDIv9Bldr+8JfL7iVtiXXZR5h/qOXtLFyJwhD2/MPZ8U54gtCYOKZO5jK8gE3aEOvfwPLprHE4phd8sTwobIBe2FuefqgpkjZyJgsOpxHMoZG2TzfPuN+I25qjMuxKD+GrIU="
 
 notifications:
   email: false

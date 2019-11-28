@@ -14,24 +14,25 @@ def read_src_version():
 
 install_requires = [
     'aiojobs>=0.2.2',
-    'async_timeout>=3.0.1',
+    'async_timeout~=3.0.1',
     'attrs>=18.1.0',
-    'msgpack>=0.6.0',
-    'python-snappy>=0.5.4',
+    'msgpack~=0.6.2',
     'yarl>=1.3.0',
+    'typing-extensions; python_version<"3.8.0"',
 ]
 
 build_requires = [
-    'wheel>=0.33.4',
-    'twine>=1.13.0',
+    'wheel>=0.33.6',
+    'twine>=3.1.0',
 ]
 
 test_requires = [
-    'pytest>=4.6',
+    'pytest>=5.2',
     'pytest-asyncio>=0.10',
     'pytest-cov',
     'pytest-mock',
-    'flake8',
+    'mypy>=0.740',
+    'flake8>=3.7.9',
     'codecov',
 ]
 
@@ -51,11 +52,15 @@ thrift_requires = [
 ]
 
 zmq_requires = [
-    'pyzmq>=18.0.0',
+    'pyzmq>=18.1.1',
 ]
 
 redis_requires = [
-    'aioredis>=1.2.0',
+    'aioredis>=1.3.0',
+]
+
+compress_requires = [
+    'python-snappy>=0.5.4',
 ]
 
 setup(
@@ -101,5 +106,6 @@ setup(
         'thrift': thrift_requires,
         'zeromq': zmq_requires,
         'redis': redis_requires,
+        'compress': compress_requires,
     },
 )
