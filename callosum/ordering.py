@@ -10,7 +10,7 @@ from typing import Optional
 try:
     from typing import Final  # type: ignore
 except ImportError:
-    from typing_extensions import Final
+    from typing_extensions import Final  # type: ignore
 
 import attr
 
