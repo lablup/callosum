@@ -91,6 +91,9 @@ setup(
         '': 'src',
     },
     packages=find_packages('src'),
+    package_data={
+        'callosum': ['py.typed'],
+    },
     include_package_data=True,
     python_requires='>=3.8',
     setup_requires=['setuptools>=42.0.1'],
