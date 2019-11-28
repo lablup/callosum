@@ -2,7 +2,7 @@ import asyncio
 import functools
 import logging
 from typing import (
-    Any, Callable, Optional, Type,
+    Any, Callable, Optional, Type, Union,
     Mapping, MutableMapping,
     List,
 )
@@ -19,7 +19,7 @@ from .auth import AbstractAuthenticator
 from .exceptions import ServerError, HandlerError
 from .pubsub_message import PubSubMessage
 from .rpc_message import RPCMessage, RPCMessageTypes
-from .abc import CLOSED, CANCELLED
+from .abc import Sentinel, CLOSED, CANCELLED
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler, SEQ_BITS,
@@ -72,7 +72,7 @@ class Publisher:
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractBinder]
-    _outgoing_queue: asyncio.Queue[AbstractMessage]
+    _outgoing_queue: asyncio.Queue[Union[Sentinel, AbstractMessage]]
     _send_task: Optional[asyncio.Task]
 
     def __init__(self, *,
@@ -90,7 +90,7 @@ class Publisher:
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
-                                        transport_opts=transport_opts)
+                                    transport_opts=transport_opts)
 
         self._outgoing_queue = asyncio.Queue()
         self._send_task = None
@@ -104,6 +104,7 @@ class Publisher:
             msg = await self._outgoing_queue.get()
             if msg is CLOSED:
                 break
+            assert not isinstance(msg, Sentinel)
             await self._connection.send_message(
                 msg.encode(self._serializer))
 
@@ -239,7 +240,7 @@ class Peer:
     _stream_registry: MutableMapping[str, StreamHandler]
     _streaming_chunks: asyncio.Queue[AbstractMessage]
     _function_requests: asyncio.Queue[RPCMessage]
-    _outgoing_queue: asyncio.Queue[RPCMessage]
+    _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
 
@@ -345,6 +346,7 @@ class Peer:
             msg = await self._outgoing_queue.get()
             if msg is CLOSED:
                 break
+            assert not isinstance(msg, Sentinel)
             await self._connection.send_message(
                 msg.encode(self._serializer))
 
@@ -411,6 +413,7 @@ class Peer:
                 else:
                     if result is CANCELLED:
                         return
+                    assert not isinstance(result, Sentinel)
                     response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
 

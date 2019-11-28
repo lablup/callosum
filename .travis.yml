@@ -12,7 +12,6 @@ stages:
     if: tag IS present
 
 python:
-  - "3.7"
   - "3.8"
 os:
   - linux
@@ -22,10 +21,10 @@ matrix:
 
 install:
   - pip install -U setuptools pip
-  - pip install -U -e ".[ci,zeromq,redis]"
+  - pip install -U -e ".[build,dev,test,zeromq,redis]"
 script:
-  - python -m mypy callosum
-  - python -m flake8 callosum tests
+  - python -m mypy callosum examples
+  - python -m flake8 callosum tests examples
   - python -m pytest tests
 after_success:
   - codecov
@@ -38,7 +37,6 @@ jobs:
 
     - stage: deploy
       python: "3.8"
-      install: skip
       script: skip
       after_script: skip
       deploy:
@@ -53,7 +51,7 @@ jobs:
 
   exclude:
     # exclude the redundant default job
-    - python: "3.7"
+    - python: "3.8"
 
 
 notifications:

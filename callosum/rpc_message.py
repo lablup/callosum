@@ -1,10 +1,8 @@
+from __future__ import annotations
+
 import enum
 import sys
-from typing import Any, Optional
-try:
-    from typing import Final  # type: ignore
-except ImportError:
-    from typing_extensions import Final  # type: ignore
+from typing import Any, Final, Optional
 
 import attr
 try:
@@ -13,7 +11,10 @@ try:
 except ImportError:
     has_snappy: Final = False  # type: ignore
 
-from .abc import AbstractMessage, RawHeaderBody
+from .abc import (
+    AbstractSerializer, AbstractDeserializer,
+    AbstractMessage, RawHeaderBody,
+)
 from .exceptions import ConfigurationError
 from .serialize import mpackb, munpackb
 
@@ -148,7 +149,8 @@ class RPCMessage(AbstractMessage):
         )
 
     @classmethod
-    def decode(cls, raw_msg: RawHeaderBody, deserializer):
+    def decode(cls, raw_msg: RawHeaderBody,
+               deserializer: AbstractDeserializer) -> RPCMessage:
         header = munpackb(raw_msg[0])
         msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
@@ -166,7 +168,7 @@ class RPCMessage(AbstractMessage):
                    metadata,
                    deserializer(data['body']))
 
-    def encode(self, serializer, compress: bool = True) \
+    def encode(self, serializer: AbstractSerializer, compress: bool = False) \
               -> RawHeaderBody:
         metadata = b''
         if self.metadata is not None:

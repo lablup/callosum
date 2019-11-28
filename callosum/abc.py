@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import abc
 from typing import (
-    Any,
+    Any, Final,
     Callable,
     Tuple,
+    Protocol,
 )
-try:
-    from typing import Final  # type: ignore
-except ImportError:
-    from typing_extensions import Final  # type: ignore
 
 
 RawHeaderBody = Tuple[bytes, bytes]
@@ -31,11 +28,24 @@ A sentinel object that represents cancellation during RPC requests.
 CANCELLED: Final = Sentinel()
 
 
-class AbstractMessage(Sentinel, metaclass=abc.ABCMeta):
+class AbstractSerializer(Protocol):
+
+    def __call__(self, obj: Any) -> bytes:
+        ...
+
+
+class AbstractDeserializer(Protocol):
+
+    def __call__(self, data: bytes) -> Any:
+        ...
+
+
+class AbstractMessage(metaclass=abc.ABCMeta):
 
     @classmethod
     @abc.abstractmethod
-    def decode(cls, raw_msg: RawHeaderBody, deserializer) -> AbstractMessage:
+    def decode(cls, raw_msg: RawHeaderBody,
+               deserializer: AbstractDeserializer) -> AbstractMessage:
         '''
         Decodes the message and applies deserializer to the body.
         Returns an instance of inheriting message class.
@@ -46,7 +56,7 @@ class AbstractMessage(Sentinel, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def encode(self, serializer) -> RawHeaderBody:
+    def encode(self, serializer: AbstractSerializer) -> RawHeaderBody:
         '''
         Encodes the message and applies serializer to body.
 

@@ -7,8 +7,8 @@ from typing import (
 
 import attr
 from .abc import (
-    AbstractMessage,
-    RawHeaderBody,
+    AbstractSerializer, AbstractDeserializer,
+    AbstractMessage, RawHeaderBody,
 )
 from .serialize import mpackb, munpackb
 
@@ -22,7 +22,7 @@ class PubSubMessage(AbstractMessage):
     body: Any
 
     @property
-    def header(self):
+    def header(self) -> datetime.datetime:
         return self.timestamp
 
     @classmethod
@@ -30,7 +30,8 @@ class PubSubMessage(AbstractMessage):
         return cls(timestamp, body)
 
     @classmethod
-    def decode(cls, raw_msg: RawHeaderBody, deserializer) -> PubSubMessage:
+    def decode(cls, raw_msg: RawHeaderBody,
+               deserializer: AbstractDeserializer) -> PubSubMessage:
         header = munpackb(raw_msg[0])
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
@@ -38,7 +39,7 @@ class PubSubMessage(AbstractMessage):
         body = munpackb(raw_msg[1])
         return cls(timestamp, deserializer(body))
 
-    def encode(self, serializer) -> RawHeaderBody:
+    def encode(self, serializer: AbstractSerializer) -> RawHeaderBody:
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp: str = self.timestamp.strftime(fmt)

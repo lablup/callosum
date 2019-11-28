@@ -15,10 +15,10 @@ def read_src_version():
 install_requires = [
     'aiojobs>=0.2.2',
     'async_timeout~=3.0.1',
-    'attrs>=18.1.0',
+    'attrs>=19.3.0',
+    'python-dateutil>=2.8.1',
     'msgpack~=0.6.2',
     'yarl>=1.3.0',
-    'typing-extensions; python_version<"3.8.0"',
 ]
 
 build_requires = [
@@ -36,11 +36,9 @@ test_requires = [
     'codecov',
 ]
 
-dev_requires = build_requires + test_requires + [
+dev_requires = [
     'pytest-sugar',
 ]
-
-ci_requires = build_requires + test_requires + []
 
 docs_requires = [
     'sphinx',
@@ -94,7 +92,7 @@ setup(
         'callosum.lower',
         'callosum.upper',
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     setup_requires=['setuptools>=42.0.1'],
     install_requires=install_requires,
     extras_require={

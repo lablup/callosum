@@ -6,11 +6,7 @@ from collections import defaultdict
 import functools
 import heapq
 import logging
-from typing import Optional
-try:
-    from typing import Final  # type: ignore
-except ImportError:
-    from typing_extensions import Final  # type: ignore
+from typing import Final, Optional
 
 import attr
 
