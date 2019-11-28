@@ -7,13 +7,17 @@ import functools
 import heapq
 import logging
 from typing import Optional
+try:
+    from typing import Final  # type: ignore
+except ImportError:
+    from typing_extensions import Final
 
 import attr
 
 from .serial import serial_lt
-from .abc import cancelled
+from .abc import CANCELLED
 
-SEQ_BITS = 32
+SEQ_BITS: Final = 32
 
 
 def _resolve_future(request_id, fut, result, log):
@@ -121,7 +125,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             s.ev.set()
             fut = self.get_fut(rqst_id)
             if task.cancelled():
-                result = cancelled  # sentinel object
+                result = CANCELLED
                 _resolve_future(rqst_id, fut, result, self._log)
             else:
                 _resolve_future(rqst_id, fut, task.result(), self._log)
