@@ -2,9 +2,9 @@ import asyncio
 import functools
 import logging
 from typing import (
-    Callable, Type,
-    Mapping, List,
-    Any,
+    Any, Callable, Optional, Type,
+    Mapping, MutableMapping,
+    List,
 )
 from datetime import datetime
 from dateutil.tz import tzutc
@@ -14,18 +14,21 @@ import aiojobs
 from async_timeout import timeout
 import attr
 
+from .abc import AbstractMessage, FunctionHandler, StreamHandler
 from .auth import AbstractAuthenticator
-from .compat import current_loop
 from .exceptions import ServerError, HandlerError
 from .pubsub_message import PubSubMessage
 from .rpc_message import RPCMessage, RPCMessageTypes
-from .abc import cancelled
+from .abc import CLOSED, CANCELLED
 from .ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler, SEQ_BITS,
 )
 from .lower import (
     AbstractAddress,
+    AbstractBinder,
+    AbstractConnector,
+    AbstractConnection,
     BaseTransport,
 )
 
@@ -50,9 +53,6 @@ def _identity(val):
     return val
 
 
-sentinel = object()
-
-
 @attr.dataclass(frozen=True, slots=True)
 class Tunnel:
     peer: 'Peer'
@@ -69,6 +69,11 @@ class Publisher:
     '''
     Represents a unidirectional message publisher.
     '''
+
+    _connection: Optional[AbstractConnection]
+    _opener: Optional[AbstractBinder]
+    _outgoing_queue: asyncio.Queue[AbstractMessage]
+    _send_task: Optional[asyncio.Task]
 
     def __init__(self, *,
                  bind: AbstractAddress = None,
@@ -92,31 +97,35 @@ class Publisher:
 
         self._log = logging.getLogger(__name__ + '.Publisher')
 
-    async def _send_loop(self):
+    async def _send_loop(self) -> None:
+        if self._connection is None:
+            raise RuntimeError('consumer is not opened yet.')
         while True:
             msg = await self._outgoing_queue.get()
-            if msg is sentinel:
+            if msg is CLOSED:
                 break
             await self._connection.send_message(
                 msg.encode(self._serializer))
 
-    async def open(self):
-        loop = current_loop()
-        self._opener = functools.partial(self._transport.bind,
-                                         self._bind)()
-        self._connection = await self._opener.__aenter__()
-        self._send_task = loop.create_task(self._send_loop())
+    async def open(self) -> None:
+        _opener = functools.partial(self._transport.bind,
+                                    self._bind)()
+        self._opener = _opener
+        self._connection = await _opener.__aenter__()
+        self._send_task = asyncio.create_task(self._send_loop())
 
-    async def close(self):
+    async def close(self) -> None:
         if self._send_task is not None:
-            await self._outgoing_queue.put(sentinel)
+            if self._opener is not None:
+                await self._opener.__aexit__(None, None, None)
+            await self._outgoing_queue.put(CLOSED)
             await self._send_task
         if self._transport is not None:
             await self._transport.close()
 
     def push(self,
              body,
-             timestamp: datetime = datetime.now(tzutc())):
+             timestamp: datetime = datetime.now(tzutc())) -> None:
         msg = PubSubMessage.create(timestamp, body)
         self._outgoing_queue.put_nowait(msg)
 
@@ -128,6 +137,11 @@ class Consumer:
     aiojobs scheduler with maximum concurrency
     of max_concurrency will be used.
     '''
+
+    _connection: Optional[AbstractConnection]
+    _opener: Optional[AbstractConnector]
+    _incoming_queue: asyncio.Queue[AbstractMessage]
+    _recv_task: Optional[asyncio.Task]
 
     def __init__(self, *,
                  connect: AbstractAddress = None,
@@ -157,10 +171,12 @@ class Consumer:
         self._log = logging.getLogger(__name__ + '.Consumer')
 
     def add_handler(self,
-                    callback: Callable):
+                    callback: Callable) -> None:
         self._handler_registry.append(callback)
 
-    async def _recv_loop(self):
+    async def _recv_loop(self) -> None:
+        if self._connection is None:
+            raise RuntimeError('consumer is not opened yet.')
         while True:
             try:
                 async for raw_msg in self._connection.recv_message():
@@ -171,22 +187,23 @@ class Consumer:
             except asyncio.CancelledError:
                 break
 
-    async def open(self):
-        loop = current_loop()
-        self._opener = functools.partial(self._transport.connect,
-                                         self._connect)()
-        self._connection = await self._opener.__aenter__()
-        self._recv_task = loop.create_task(self._recv_loop())
+    async def open(self) -> None:
+        _opener = functools.partial(self._transport.connect,
+                                    self._connect)()
+        self._opener = _opener
+        self._connection = await _opener.__aenter__()
+        self._recv_task = asyncio.create_task(self._recv_loop())
 
-    async def close(self):
+    async def close(self) -> None:
         if self._recv_task is not None:
-            await self._opener.__aexit__(None, None, None)
+            if self._opener is not None:
+                await self._opener.__aexit__(None, None, None)
             self._recv_task.cancel()
             await self._recv_task
         if self._transport is not None:
             await self._transport.close()
 
-    async def listen(self):
+    async def listen(self) -> None:
         '''
         Fetches incoming messages and calls appropriate
         handlers from "_handler_registry".
@@ -195,7 +212,7 @@ class Consumer:
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
-        loop = current_loop()
+        loop = asyncio.get_running_loop()
         while True:
             msg = await self._incoming_queue.get()
             for handler in self._handler_registry:
@@ -217,6 +234,15 @@ class Peer:
     RPC client and RPC server.
     '''
 
+    _connection: Optional[AbstractConnection]
+    _func_registry: MutableMapping[str, FunctionHandler]
+    _stream_registry: MutableMapping[str, StreamHandler]
+    _streaming_chunks: asyncio.Queue[AbstractMessage]
+    _function_requests: asyncio.Queue[RPCMessage]
+    _outgoing_queue: asyncio.Queue[RPCMessage]
+    _recv_task: Optional[asyncio.Task]
+    _send_task: Optional[asyncio.Task]
+
     def __init__(self, *,
                  connect: AbstractAddress = None,
                  bind: AbstractAddress = None,
@@ -230,7 +256,7 @@ class Peer:
                  max_body_size: int = 10 * (2**20),  # 10 MiBytes
                  max_concurrency: int = 100,
                  execute_timeout: float = None,
-                 invoke_timeout: float = None):
+                 invoke_timeout: float = None) -> None:
 
         if connect is None and bind is None:
             raise ValueError('You must specify either the connect or bind address.')
@@ -270,16 +296,16 @@ class Peer:
 
         self._log = logging.getLogger(__name__ + '.Peer')
 
-    def handle_function(self, method, handler):
+    def handle_function(self, method: str, handler: FunctionHandler) -> None:
         self._func_registry[method] = handler
 
-    def handle_stream(self, method, handler):
+    def handle_stream(self, method: str, handler: StreamHandler) -> None:
         self._stream_registry[method] = handler
 
-    def unhandle_function(self, method):
+    def unhandle_function(self, method: str) -> None:
         del self._func_registry[method]
 
-    def unhandle_stream(self, method):
+    def unhandle_stream(self, method: str) -> None:
         del self._stream_registry[method]
 
     def _lookup(self, msgtype, method):
@@ -289,7 +315,9 @@ class Peer:
             return self._stream_registry[method]
         raise ValueError('Invalid msgtype')
 
-    async def _recv_loop(self):
+    async def _recv_loop(self) -> None:
+        if self._connection is None:
+            raise RuntimeError('consumer is not opened yet.')
         while True:
             try:
                 async for raw_msg in self._connection.recv_message():
@@ -310,37 +338,40 @@ class Peer:
             except asyncio.CancelledError:
                 break
 
-    async def _send_loop(self):
+    async def _send_loop(self) -> None:
+        if self._connection is None:
+            raise RuntimeError('consumer is not opened yet.')
         while True:
             msg = await self._outgoing_queue.get()
-            if msg is sentinel:
+            if msg is CLOSED:
                 break
             await self._connection.send_message(
                 msg.encode(self._serializer))
 
-    async def open(self):
-        loop = current_loop()
+    async def open(self) -> None:
         if self._connect:
-            self._opener = functools.partial(self._transport.connect,
-                                             self._connect)()
+            _opener = functools.partial(self._transport.connect,
+                                        self._connect)()
         elif self._bind:
-            self._opener = functools.partial(self._transport.bind,
-                                             self._bind)()
+            _opener = functools.partial(self._transport.bind,
+                                        self._bind)()
         else:
             raise RuntimeError('Misconfigured opener')
-        self._connection = await self._opener.__aenter__()
+        self._opener = _opener
+        self._connection = await _opener.__aenter__()
         # NOTE: if we change the order of the following 2 lines of code,
         # then there will be error after "flushall" redis.
-        self._send_task = loop.create_task(self._send_loop())
-        self._recv_task = loop.create_task(self._recv_loop())
+        self._send_task = asyncio.create_task(self._send_loop())
+        self._recv_task = asyncio.create_task(self._recv_loop())
 
-    async def close(self):
+    async def close(self) -> None:
         if self._send_task is not None:
-            await self._outgoing_queue.put(sentinel)
+            await self._outgoing_queue.put(CLOSED)
             await self._send_task
         if self._recv_task is not None:
             # TODO: pass exception description, e.g. during invoke timeout
-            await self._opener.__aexit__(None, None, None)
+            if self._opener is not None:
+                await self._opener.__aexit__(None, None, None)
             self._recv_task.cancel()
             await self._recv_task
         if self._scheduler is not None:
@@ -350,7 +381,7 @@ class Peer:
         # TODO: add proper cleanup for awaiting on
         # finishing of the "listen" coroutine's spawned tasks
 
-    async def listen(self):
+    async def listen(self) -> None:
         '''
         Run a loop to fetch function requests from the transport connection.
         '''
@@ -358,12 +389,12 @@ class Peer:
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
-        loop = current_loop()
         while True:
             request = await self._function_requests.get()
             handler = self._lookup(request.msgtype, request.method)
 
-            async def _func_task(request, handler):
+            async def _func_task(request: RPCMessage,
+                                 handler: FunctionHandler):
                 rqst_id = request.request_id
                 try:
                     await self._func_scheduler.schedule(
@@ -371,21 +402,21 @@ class Peer:
                         self._scheduler,
                         handler(request))
                     result = await self._func_scheduler.get_fut(rqst_id)
-                    self._func_scheduler.cleanup(rqst_id)
+                    await self._func_scheduler.cleanup(rqst_id)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     raise
                 except Exception as e:
                     self._log.error('Uncaught exception')
                     response = RPCMessage.error(request, e)
                 else:
-                    if result is cancelled:
+                    if result is CANCELLED:
                         return
                     response = RPCMessage.result(request, result)
                 await self._outgoing_queue.put(response)
 
-            loop.create_task(_func_task(request, handler))
+            asyncio.create_task(_func_task(request, handler))
 
-    async def invoke(self, method, body, *,
+    async def invoke(self, method: str, body, *,
                      order_key=None, invoke_timeout=None):
         '''
         Invoke a remote function via the transport connection.
@@ -397,7 +428,7 @@ class Peer:
         self._seq_id = (self._seq_id + 1) % SEQ_BITS
         with timeout(invoke_timeout):
             try:
-                request = None
+                request: RPCMessage
                 if callable(body):
                     # The user is using an upper-layer adaptor.
                     agen = body()

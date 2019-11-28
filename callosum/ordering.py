@@ -10,7 +10,6 @@ from typing import Optional
 
 import attr
 
-from .compat import current_loop
 from .serial import serial_lt
 from .abc import cancelled
 
@@ -41,7 +40,7 @@ class AsyncResolver:
     def wait(self, request_id) -> asyncio.Future:
         if request_id in self._futures:
             raise RuntimeError('duplicate request: %r', request_id)
-        loop = current_loop()
+        loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._futures[request_id] = fut
         return fut
@@ -53,6 +52,9 @@ class AsyncResolver:
     def resolve(self, request_id, result):
         fut = self._futures.pop(request_id, None)
         _resolve_future(request_id, fut, result, self._log)
+
+    async def cleanup(self, request_id):
+        pass
 
 
 class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
@@ -69,9 +71,13 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
     async def cancel(self, request_id):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def cleanup(self, request_id):
+        raise NotImplementedError
+
 
 @functools.total_ordering
-@attr.dataclass(frozen=True, slots=True, cmp=False)
+@attr.dataclass(frozen=True, slots=True, eq=False, order=False)
 class _SeqItem:
     method: str
     seq: int
@@ -96,7 +102,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
     async def schedule(self, request_id, scheduler, coro):
         method, okey, seq = request_id
-        loop = current_loop()
+        loop = asyncio.get_running_loop()
         self._futures[request_id] = loop.create_future()
         ev = asyncio.Event()
         heapq.heappush(self._pending[okey], _SeqItem(method, seq, ev))
@@ -128,7 +134,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     def get_fut(self, request_id) -> asyncio.Future:
         return self._futures[request_id]
 
-    def cleanup(self, request_id):
+    async def cleanup(self, request_id):
         self._futures.pop(request_id)
         if request_id in self._jobs:
             self._jobs.pop(request_id)
@@ -187,7 +193,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         method, okey, seq = request_id
         heapq.heappush(self._sequences[okey], _SeqItem(method, seq))
 
-        loop = current_loop()
+        loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._futures[request_id] = fut
         return fut
@@ -213,3 +219,6 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
                 break
         if len(self._sequences[okey]) == 0:
             del self._sequences[okey]
+
+    async def cleanup(self, request_id):
+        pass

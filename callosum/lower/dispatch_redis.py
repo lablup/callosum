@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Optional, Union,
+    AsyncGenerator,
+    Mapping, Tuple,
+)
 
 import aioredis
 import attr
@@ -34,7 +38,7 @@ class DispatchRedisConnection(AbstractConnection):
 
     transport: DispatchRedisTransport
     addr: RedisStreamAddress
-    direction_keys: Tuple[str, str]
+    direction_keys: Optional[Tuple[str, str]]
 
     def __init__(self, transport: DispatchRedisTransport,
                  addr: RedisStreamAddress,

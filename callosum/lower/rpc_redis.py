@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Optional, Union,
+    AsyncGenerator,
+    Mapping, Tuple,
+)
 
 import aioredis
 import attr
@@ -28,7 +32,7 @@ class RPCRedisConnection(AbstractConnection):
 
     transport: RPCRedisTransport
     addr: RedisStreamAddress
-    direction_keys: Tuple[str, str]
+    direction_keys: Optional[Tuple[str, str]]
 
     def __init__(self, transport: RPCRedisTransport,
                  addr: RedisStreamAddress,

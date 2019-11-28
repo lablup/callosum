@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import datetime
 from typing import (
-    Tuple,
     Any,
 )
 
 import attr
-from . import (
+from .abc import (
     AbstractMessage,
+    RawHeaderBody,
 )
 
 
@@ -27,7 +29,7 @@ class PubSubMessage(AbstractMessage):
         return cls(timestamp, body)
 
     @classmethod
-    def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
+    def decode(cls, raw_msg: RawHeaderBody, deserializer) -> PubSubMessage:
         header = cls.munpackb(raw_msg[0])
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
@@ -35,8 +37,7 @@ class PubSubMessage(AbstractMessage):
         body = cls.munpackb(raw_msg[1])
         return cls(timestamp, deserializer(body))
 
-    def encode(self, serializer) \
-              -> Tuple[bytes, bytes]:
+    def encode(self, serializer) -> RawHeaderBody:
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp: str = self.timestamp.strftime(fmt)

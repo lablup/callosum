@@ -1,6 +1,6 @@
 import enum
 import sys
-from typing import Optional, Tuple
+from typing import Any, Optional
 try:
     from typing import Final  # type: ignore
 except ImportError:
@@ -14,18 +14,18 @@ try:
 except ImportError:
     has_snappy: Final = False  # type: ignore
 
-from .abc import AbstractMessage
+from .abc import AbstractMessage, RawHeaderBody
 from .exceptions import ConfigurationError
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
 
 
-def mpackb(v):
+def mpackb(v: Any) -> bytes:
     return msgpack.packb(v, use_bin_type=True)
 
 
-def munpackb(b):
+def munpackb(b: bytes) -> Any:
     return msgpack.unpackb(b, raw=False, use_list=False)
 
 
@@ -38,12 +38,12 @@ class TupleEncodingMixin:
     '''
 
     @classmethod
-    def decode(cls, buffer):
+    def decode(cls, buffer: bytes):
         if not buffer:
             return None
         return cls(*munpackb(buffer))
 
-    def encode(self):
+    def encode(self) -> Any:
         cls = type(self)
         values = [getattr(self, f.name) for f in attr.fields(cls)]
         return mpackb(values)
@@ -156,7 +156,7 @@ class RPCMessage(AbstractMessage):
         )
 
     @classmethod
-    def decode(cls, raw_msg: Tuple[bytes, bytes], deserializer):
+    def decode(cls, raw_msg: RawHeaderBody, deserializer):
         header = cls.munpackb(raw_msg[0])
         msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
@@ -175,7 +175,7 @@ class RPCMessage(AbstractMessage):
                    deserializer(data['body']))
 
     def encode(self, serializer, compress: bool = True) \
-              -> Tuple[bytes, bytes]:
+              -> RawHeaderBody:
         metadata = b''
         if self.metadata is not None:
             metadata = self.metadata.encode()
