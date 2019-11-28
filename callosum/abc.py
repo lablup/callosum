@@ -10,7 +10,6 @@ try:
     from typing import Final  # type: ignore
 except ImportError:
     from typing_extensions import Final  # type: ignore
-import msgpack
 
 
 RawHeaderBody = Tuple[bytes, bytes]
@@ -55,14 +54,6 @@ class AbstractMessage(Sentinel, metaclass=abc.ABCMeta):
             serializer: Body serializer.
         '''
         raise NotImplementedError
-
-    @staticmethod
-    def mpackb(v):
-        return msgpack.packb(v, use_bin_type=True)
-
-    @staticmethod
-    def munpackb(b):
-        return msgpack.unpackb(b, raw=False, use_list=False)
 
 
 FunctionHandler = Callable[..., Any]

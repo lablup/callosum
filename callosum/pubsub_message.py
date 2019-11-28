@@ -10,6 +10,7 @@ from .abc import (
     AbstractMessage,
     RawHeaderBody,
 )
+from .serialize import mpackb, munpackb
 
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
@@ -30,11 +31,11 @@ class PubSubMessage(AbstractMessage):
 
     @classmethod
     def decode(cls, raw_msg: RawHeaderBody, deserializer) -> PubSubMessage:
-        header = cls.munpackb(raw_msg[0])
+        header = munpackb(raw_msg[0])
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp = datetime.datetime.strptime(header['timestamp'], fmt)
-        body = cls.munpackb(raw_msg[1])
+        body = munpackb(raw_msg[1])
         return cls(timestamp, deserializer(body))
 
     def encode(self, serializer) -> RawHeaderBody:
@@ -44,7 +45,7 @@ class PubSubMessage(AbstractMessage):
         header = {
             'timestamp': timestamp,
         }
-        serialized_header: bytes = self.mpackb(header)
+        serialized_header: bytes = mpackb(header)
         body = serializer(self.body)
-        serialized_body: bytes = self.mpackb(body)
+        serialized_body: bytes = mpackb(body)
         return (serialized_header, serialized_body)

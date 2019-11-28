@@ -7,7 +7,6 @@ except ImportError:
     from typing_extensions import Final  # type: ignore
 
 import attr
-import msgpack
 try:
     import snappy  # type: ignore
     has_snappy: Final = True
@@ -16,17 +15,10 @@ except ImportError:
 
 from .abc import AbstractMessage, RawHeaderBody
 from .exceptions import ConfigurationError
+from .serialize import mpackb, munpackb
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
-
-
-def mpackb(v: Any) -> bytes:
-    return msgpack.packb(v, use_bin_type=True)
-
-
-def munpackb(b: bytes) -> Any:
-    return msgpack.unpackb(b, raw=False, use_list=False)
 
 
 class TupleEncodingMixin:
@@ -38,12 +30,12 @@ class TupleEncodingMixin:
     '''
 
     @classmethod
-    def decode(cls, buffer: bytes):
+    def decode(cls, buffer: bytes) -> Any:
         if not buffer:
             return None
         return cls(*munpackb(buffer))
 
-    def encode(self) -> Any:
+    def encode(self) -> bytes:
         cls = type(self)
         values = [getattr(self, f.name) for f in attr.fields(cls)]
         return mpackb(values)
@@ -133,7 +125,7 @@ class RPCMessage(AbstractMessage):
             RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
-            cls.mpackb(tuple(map(str, exc.args))),
+            mpackb(tuple(map(str, exc.args))),
         )
 
     @classmethod
@@ -144,7 +136,7 @@ class RPCMessage(AbstractMessage):
             RPCMessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, ''),
-            cls.mpackb(list(map(str, exc_info[1].args))),
+            mpackb(list(map(str, exc_info[1].args))),
         )
 
     @classmethod
@@ -157,7 +149,7 @@ class RPCMessage(AbstractMessage):
 
     @classmethod
     def decode(cls, raw_msg: RawHeaderBody, deserializer):
-        header = cls.munpackb(raw_msg[0])
+        header = munpackb(raw_msg[0])
         msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
         raw_data: bytes = raw_msg[1]
@@ -165,7 +157,7 @@ class RPCMessage(AbstractMessage):
             if not has_snappy:
                 raise ConfigurationError('python-snappy is not installed')
             raw_data = snappy.decompress(raw_data)
-        data = cls.munpackb(raw_data)
+        data = munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
         return cls(msgtype,
                    header['meth'],
@@ -186,7 +178,7 @@ class RPCMessage(AbstractMessage):
             'seq': self.seq_id,
             'zip': compress,
         }
-        serialized_header: bytes = self.mpackb(header)
+        serialized_header: bytes = mpackb(header)
         if self.msgtype in (RPCMessageTypes.FUNCTION,
                             RPCMessageTypes.RESULT,
                             RPCMessageTypes.CANCEL):
@@ -197,7 +189,7 @@ class RPCMessage(AbstractMessage):
             'meta': metadata,
             'body': body,
         }
-        serialized_data: bytes = self.mpackb(data)
+        serialized_data: bytes = mpackb(data)
         if compress:
             if not has_snappy:
                 raise ConfigurationError('python-snappy is not installed')
