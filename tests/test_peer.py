@@ -1,4 +1,4 @@
-from callosum import Peer
+from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 import pytest

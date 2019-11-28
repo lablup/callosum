@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime
 from dateutil.tz import tzutc
 
-from callosum import (
+from callosum.pubsub import (
     Publisher,
 )
 from callosum.lower.dispatch_redis import (

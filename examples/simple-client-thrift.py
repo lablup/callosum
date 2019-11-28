@@ -3,7 +3,7 @@ import pathlib
 import random
 import secrets
 
-from callosum import Peer
+from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 from callosum.upper.thrift import ThriftClientAdaptor
 import thriftpy

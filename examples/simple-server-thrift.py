@@ -1,7 +1,7 @@
 import asyncio
 import pathlib
 
-from callosum import Peer
+from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 from callosum.upper.thrift import ThriftServerAdaptor
 import thriftpy

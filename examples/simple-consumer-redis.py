@@ -8,7 +8,7 @@ which have not been obtained by others so far.
 import asyncio
 import json
 
-from callosum import (
+from callosum.pubsub import (
     Consumer,
 )
 from callosum.lower.dispatch_redis import (

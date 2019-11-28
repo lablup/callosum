@@ -3,7 +3,7 @@ import json
 import random
 import secrets
 
-from callosum import Peer
+from callosum.rpc import Peer
 from callosum.lower.rpc_redis import (
     RedisStreamAddress,
     RPCRedisTransport,

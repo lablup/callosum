@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 
-from callosum import Peer
+from callosum.rpc import Peer
 from callosum.lower.rpc_redis import (
     RedisStreamAddress,
     RPCRedisTransport,
