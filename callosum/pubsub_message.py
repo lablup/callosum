@@ -36,8 +36,7 @@ class PubSubMessage(AbstractMessage):
         # format string assumes that datetime object includes timezone!
         fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
         timestamp = datetime.datetime.strptime(header['timestamp'], fmt)
-        body = munpackb(raw_msg[1])
-        return cls(timestamp, deserializer(body))
+        return cls(timestamp, deserializer(raw_msg[1]))
 
     def encode(self, serializer: AbstractSerializer) -> RawHeaderBody:
         # format string assumes that datetime object includes timezone!
@@ -47,6 +46,5 @@ class PubSubMessage(AbstractMessage):
             'timestamp': timestamp,
         }
         serialized_header: bytes = mpackb(header)
-        body = serializer(self.body)
-        serialized_body: bytes = mpackb(body)
+        serialized_body: bytes = serializer(self.body)
         return (serialized_header, serialized_body)
