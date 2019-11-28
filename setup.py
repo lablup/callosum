@@ -99,7 +99,6 @@ setup(
         'build': build_requires,
         'test': test_requires,
         'dev': dev_requires,
-        'ci': ci_requires,
         'docs': docs_requires,
         'thrift': thrift_requires,
         'zeromq': zmq_requires,
