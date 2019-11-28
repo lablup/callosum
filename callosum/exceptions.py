@@ -2,6 +2,10 @@ class CallosumError(Exception):
     pass
 
 
+class ConfigurationError(CallosumError):
+    pass
+
+
 class InvalidAddressError(CallosumError, ValueError):
 
     def __init__(self, invalid_param: str = None):

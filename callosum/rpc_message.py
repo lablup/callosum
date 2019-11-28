@@ -1,12 +1,21 @@
 import enum
 import sys
 from typing import Optional, Tuple
+try:
+    from typing import Final  # type: ignore
+except ImportError:
+    from typing_extensions import Final
 
 import attr
 import msgpack
-import snappy
+try:
+    import snappy  # type: ignore
+    has_snappy: Final = True
+except ImportError:
+    has_snappy: Final = False  # type: ignore
 
 from .abc import AbstractMessage
+from .exceptions import ConfigurationError
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
@@ -153,6 +162,8 @@ class RPCMessage(AbstractMessage):
         compressed = header['zip']
         raw_data: bytes = raw_msg[1]
         if compressed:
+            if not has_snappy:
+                raise ConfigurationError('python-snappy is not installed')
             raw_data = snappy.decompress(raw_data)
         data = cls.munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
@@ -176,7 +187,9 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = self.mpackb(header)
-        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT, RPCMessageTypes.CANCEL):
+        if self.msgtype in (RPCMessageTypes.FUNCTION,
+                            RPCMessageTypes.RESULT,
+                            RPCMessageTypes.CANCEL):
             body = serializer(self.body)
         else:
             body = self.body
@@ -186,5 +199,7 @@ class RPCMessage(AbstractMessage):
         }
         serialized_data: bytes = self.mpackb(data)
         if compress:
+            if not has_snappy:
+                raise ConfigurationError('python-snappy is not installed')
             serialized_data = snappy.compress(serialized_data)
         return (serialized_header, serialized_data)

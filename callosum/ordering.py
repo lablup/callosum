@@ -115,7 +115,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             s.ev.set()
             fut = self.get_fut(rqst_id)
             if task.cancelled():
-                result = cancelled #sentinel object
+                result = cancelled  # sentinel object
                 _resolve_future(rqst_id, fut, result, self._log)
             else:
                 _resolve_future(rqst_id, fut, task.result(), self._log)

@@ -13,8 +13,6 @@ from . import (
     BaseTransport,
 )
 from ..exceptions import InvalidAddressError
-# from ..auth import Identity
-# from ..compat import current_loop
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -109,9 +107,9 @@ class DispatchRedisBinder(AbstractBinder):
         # it is created as a side effect of adding the message.
         await self.transport._redis.xadd(key, {b'meta': b'create-or-join-to-stream'})
         if self.addr.group:
-            raise InvalidAddressError("group") # group must not be specified
+            raise InvalidAddressError("group")  # group must not be specified
         if self.addr.consumer:
-            raise InvalidAddressError("consumer") # consumer must not be specified
+            raise InvalidAddressError("consumer")  # consumer must not be specified
         return DispatchRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):

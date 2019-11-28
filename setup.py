@@ -95,7 +95,7 @@ setup(
         'callosum.upper',
     ],
     python_requires='>=3.7',
-    setup_requires=['setuptools>=38.6.0'],
+    setup_requires=['setuptools>=42.0.1'],
     install_requires=install_requires,
     extras_require={
         'build': build_requires,

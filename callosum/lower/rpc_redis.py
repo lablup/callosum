@@ -12,9 +12,6 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
-from ..exceptions import InvalidAddressError
-# from ..auth import Identity
-# from ..compat import current_loop
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -87,7 +84,7 @@ class RPCRedisBinder(AbstractBinder):
     Usually, the RPC server is supposed to provide
     the connect address during Peer instantiation,
     which will result in the Peer class using
-    the RPCRedisBinder for establishing 
+    the RPCRedisBinder for establishing
     the connection.
     '''
 
@@ -131,7 +128,7 @@ class RPCRedisConnector(AbstractConnector):
     Usually, the RPC invoker (client) is supposed to provide
     the connect address during Peer instantiation,
     which will result in the Peer class using
-    the RPCRedisConnector for establishing 
+    the RPCRedisConnector for establishing
     the connection.
     '''
 

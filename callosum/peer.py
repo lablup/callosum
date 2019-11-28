@@ -6,15 +6,11 @@ from typing import (
     Mapping, List,
     Any,
 )
-from enum import Enum
-from collections import defaultdict
 from datetime import datetime
 from dateutil.tz import tzutc
 import secrets
 
 import aiojobs
-from aiohttp import web
-from aiojobs.aiohttp import get_scheduler_from_app
 from async_timeout import timeout
 import attr
 
@@ -203,7 +199,8 @@ class Consumer:
         while True:
             msg = await self._incoming_queue.get()
             for handler in self._handler_registry:
-                if asyncio.iscoroutine(handler) or asyncio.iscoroutinefunction(handler):
+                if (asyncio.iscoroutine(handler) or
+                        asyncio.iscoroutinefunction(handler)):
                     await self._scheduler.spawn(handler(msg))
                 else:
                     handler = functools.partial(handler, msg)

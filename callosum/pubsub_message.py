@@ -1,13 +1,10 @@
-import enum
 import datetime
 from typing import (
-    Tuple, Callable,
+    Tuple,
     Any,
 )
-from dataclasses import dataclass
 
 import attr
-from aiohttp import web
 from . import (
     AbstractMessage,
 )
