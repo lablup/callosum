@@ -6,11 +6,11 @@ from typing import (
 )
 
 import attr
-from .abc import (
+from ..abc import (
     AbstractSerializer, AbstractDeserializer,
     AbstractMessage, RawHeaderBody,
 )
-from .serialize import mpackb, munpackb
+from ..serialize import mpackb, munpackb
 
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)

@@ -11,12 +11,12 @@ try:
 except ImportError:
     has_snappy: Final = False  # type: ignore
 
-from .abc import (
+from ..abc import (
     AbstractSerializer, AbstractDeserializer,
     AbstractMessage, RawHeaderBody,
 )
-from .exceptions import ConfigurationError
-from .serialize import mpackb, munpackb
+from ..exceptions import ConfigurationError
+from ..serialize import mpackb, munpackb
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
