@@ -23,8 +23,8 @@ install:
   - pip install -U setuptools pip
   - pip install -U -e ".[build,dev,test,zeromq,redis]"
 script:
-  - python -m mypy callosum examples
-  - python -m flake8 callosum tests examples
+  - python -m mypy src examples
+  - python -m flake8 src tests examples
   - python -m pytest tests
 after_success:
   - codecov

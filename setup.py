@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from pathlib import Path
 import re
 
@@ -6,7 +6,7 @@ root = Path(__file__).parent
 
 
 def read_src_version():
-    p = (root / 'callosum' / '__init__.py')
+    p = (root / 'src' / 'callosum' / '__init__.py')
     src = p.read_text()
     m = re.search(r"^__version__\s*=\s*'([^']+)'", src, re.M)
     return m.group(1)
@@ -73,7 +73,7 @@ setup(
     author_email='joongi@lablup.com',
     license="MIT",
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Framework :: AsyncIO',
         'License :: OSI Approved :: MIT License',
         'Intended Audience :: Developers',
@@ -81,17 +81,17 @@ setup(
         'Operating System :: MacOS :: MacOS X',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
         'Topic :: Communications',
         'Topic :: Internet',
     ],
-    packages=[
-        'callosum',
-        'callosum.lower',
-        'callosum.upper',
-    ],
+    package_dir={
+        '': 'src',
+    },
+    packages=find_packages('src'),
+    include_package_data=True,
     python_requires='>=3.8',
     setup_requires=['setuptools>=42.0.1'],
     install_requires=install_requires,

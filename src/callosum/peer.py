@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import logging
@@ -72,7 +74,7 @@ class Publisher:
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractBinder]
-    _outgoing_queue: asyncio.Queue[Union[Sentinel, AbstractMessage]]
+    _outgoing_queue: asyncio.Queue[Union[Sentinel, PubSubMessage]]
     _send_task: Optional[asyncio.Task]
 
     def __init__(self, *,
@@ -141,7 +143,7 @@ class Consumer:
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractConnector]
-    _incoming_queue: asyncio.Queue[AbstractMessage]
+    _incoming_queue: asyncio.Queue[PubSubMessage]
     _recv_task: Optional[asyncio.Task]
 
     def __init__(self, *,
