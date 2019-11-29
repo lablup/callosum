@@ -19,7 +19,7 @@ from callosum.lower.dispatch_redis import (
 )
 
 
-async def call():
+async def publish():
     pub = Publisher(bind=RedisStreamAddress(
                     'redis://localhost:6379',
                     'events'),
@@ -60,4 +60,4 @@ async def call():
 
 
 if __name__ == '__main__':
-    asyncio.run(call())
+    asyncio.run(publish())

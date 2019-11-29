@@ -79,7 +79,6 @@ class Peer:
     _func_registry: MutableMapping[str, FunctionHandler]
     _stream_registry: MutableMapping[str, StreamHandler]
     _streaming_chunks: asyncio.Queue[RPCMessage]
-    _function_requests: asyncio.Queue[RPCMessage]
     _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
@@ -124,7 +123,6 @@ class Peer:
 
         # incoming queues
         self._streaming_chunks = asyncio.Queue()
-        self._function_requests = asyncio.Queue()
         self._invocation_resolver = AsyncResolver()
         if scheduler is None:
             scheduler = KeySerializedAsyncScheduler()
@@ -159,6 +157,10 @@ class Peer:
     async def _recv_loop(self) -> None:
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
+        if self._scheduler is None:
+            self._scheduler = await aiojobs.create_scheduler(
+                limit=self._max_concurrency,
+            )
         while True:
             try:
                 async for raw_msg in self._connection.recv_message():
@@ -167,7 +169,8 @@ class Peer:
                         return
                     msg = RPCMessage.decode(raw_msg, self._deserializer)
                     if msg.msgtype == RPCMessageTypes.FUNCTION:
-                        self._function_requests.put_nowait(msg)
+                        handler = self._lookup(msg.msgtype, msg.method)
+                        asyncio.create_task(self._func_task(msg, handler))
                     elif msg.msgtype == RPCMessageTypes.CANCEL:
                         # TODO: change "await" to "create_task"
                         # and take care of that task tracking/deleting/cancellation.
@@ -189,6 +192,12 @@ class Peer:
             assert not isinstance(msg, Sentinel)
             await self._connection.send_message(
                 msg.encode(self._serializer))
+
+    async def __aenter__(self) -> None:
+        await self.open()
+
+    async def __aexit__(self, *exc_info) -> None:
+        await self.close()
 
     async def open(self) -> None:
         if self._connect:
@@ -223,41 +232,27 @@ class Peer:
         # TODO: add proper cleanup for awaiting on
         # finishing of the "listen" coroutine's spawned tasks
 
-    async def listen(self) -> None:
-        '''
-        Run a loop to fetch function requests from the transport connection.
-        '''
-        if self._scheduler is None:
-            self._scheduler = await aiojobs.create_scheduler(
-                limit=self._max_concurrency,
-            )
-        while True:
-            request = await self._function_requests.get()
-            handler = self._lookup(request.msgtype, request.method)
-
-            async def _func_task(request: RPCMessage,
-                                 handler: FunctionHandler):
-                rqst_id = request.request_id
-                try:
-                    await self._func_scheduler.schedule(
-                        rqst_id,
-                        self._scheduler,
-                        handler(request))
-                    result = await self._func_scheduler.get_fut(rqst_id)
-                    await self._func_scheduler.cleanup(rqst_id)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    raise
-                except Exception as e:
-                    self._log.error('Uncaught exception')
-                    response = RPCMessage.error(request, e)
-                else:
-                    if result is CANCELLED:
-                        return
-                    assert not isinstance(result, Sentinel)
-                    response = RPCMessage.result(request, result)
-                await self._outgoing_queue.put(response)
-
-            asyncio.create_task(_func_task(request, handler))
+    async def _func_task(self, request: RPCMessage,
+                         handler: FunctionHandler):
+        rqst_id = request.request_id
+        try:
+            await self._func_scheduler.schedule(
+                rqst_id,
+                self._scheduler,
+                handler(request))
+            result = await self._func_scheduler.get_fut(rqst_id)
+            await self._func_scheduler.cleanup(rqst_id)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            raise
+        except Exception as e:
+            self._log.error('Uncaught exception')
+            response = RPCMessage.error(request, e)
+        else:
+            if result is CANCELLED:
+                return
+            assert not isinstance(result, Sentinel)
+            response = RPCMessage.result(request, result)
+        await self._outgoing_queue.put(response)
 
     async def invoke(self, method: str, body, *,
                      order_key=None, invoke_timeout=None):

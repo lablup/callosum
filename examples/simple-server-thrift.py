@@ -1,5 +1,6 @@
 import asyncio
 import pathlib
+import signal
 
 from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
@@ -28,23 +29,19 @@ async def serve():
         simple_thrift.SimpleService,
         SimpleDispatcher())
     peer.handle_function('simple', adaptor.handle_function)
-    try:
-        await peer.open()
-        await peer.listen()
-    except asyncio.CancelledError:
-        await peer.close()
+
+    loop = asyncio.get_running_loop()
+    forever = loop.create_future()
+    loop.add_signal_handler(signal.SIGINT, forever.cancel)
+    loop.add_signal_handler(signal.SIGTERM, forever.cancel)
+    async with peer:
+        try:
+            print('server started')
+            await forever
+        except asyncio.CancelledError:
+            pass
+    print('server terminated')
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    try:
-        task = loop.create_task(serve())
-        print('listening...')
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        print('closing...')
-        task.cancel()
-        loop.run_until_complete(task)
-    finally:
-        loop.close()
-        print('closed.')
+    asyncio.run(serve())

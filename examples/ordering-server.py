@@ -1,5 +1,6 @@
 import asyncio
 import json
+import signal
 
 from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
@@ -29,35 +30,31 @@ async def handle_delimeter(request):
 
 async def serve():
     # Peer will use "KeySerializedAsyncScheduler" by default.
-    peer = Peer(bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
-                transport=ZeroMQTransport,
-                serializer=json.dumps,
-                deserializer=json.loads)
+    peer = Peer(
+        bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
+        transport=ZeroMQTransport,
+        serializer=json.dumps,
+        deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
     peer.handle_function('print_delim', handle_delimeter)
 
     print('echo() will take 1 second and add() will take 0.5 second.')
-    print('You can confirm the effect of scheduler and the ordering key by the '
-          'console logs.\n')
+    print('You can confirm the effect of scheduler '
+          'and the ordering key by the console logs.\n')
 
-    try:
-        await peer.open()
-        print('listening...')
-        await peer.listen()
-    except asyncio.CancelledError:
-        await peer.close()
+    loop = asyncio.get_running_loop()
+    forever = loop.create_future()
+    loop.add_signal_handler(signal.SIGINT, forever.cancel)
+    loop.add_signal_handler(signal.SIGTERM, forever.cancel)
+    async with peer:
+        try:
+            print('server started')
+            await forever
+        except asyncio.CancelledError:
+            pass
+    print('server terminated')
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    try:
-        task = loop.create_task(serve())
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        print('closing...')
-        task.cancel()
-        loop.run_until_complete(task)
-    finally:
-        loop.close()
-        print('closed.')
+    asyncio.run(serve())

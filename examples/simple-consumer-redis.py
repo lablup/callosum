@@ -7,6 +7,7 @@ which have not been obtained by others so far.
 '''
 import asyncio
 import json
+import signal
 
 from callosum.pubsub import (
     Consumer,
@@ -37,32 +38,27 @@ async def main_handler(msg):
         print("InvalidMessageType: message of type EventTypes was expected.")
 
 
-async def serve():
-    cons = Consumer(connect=RedisStreamAddress(
-                      'redis://localhost:6379',
-                      'events', 'consumer-group', 'consumer1'),
-                     deserializer=json.loads,
-                     transport=DispatchRedisTransport)
+async def consume():
+    cons = Consumer(
+        connect=RedisStreamAddress(
+            'redis://localhost:6379',
+            'events', 'consumer-group', 'consumer1'),
+        deserializer=json.loads,
+        transport=DispatchRedisTransport)
     cons.add_handler(main_handler)
-    try:
-        await cons.open()
-        print("listening task has started...")
-        await cons.listen()
-    except asyncio.CancelledError:
-        await cons.close()
+
+    loop = asyncio.get_running_loop()
+    forever = loop.create_future()
+    loop.add_signal_handler(signal.SIGINT, forever.cancel)
+    loop.add_signal_handler(signal.SIGTERM, forever.cancel)
+    async with cons:
+        try:
+            print('consumer started')
+            await forever
+        except asyncio.CancelledError:
+            pass
+    print('consumer terminated')
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-    try:
-        task = loop.create_task(serve())
-        print('listening...')
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        print('closing...')
-        task.cancel()
-        loop.run_until_complete(task)
-    finally:
-        loop.close()
-        print('closed.')
+    asyncio.run(consume())

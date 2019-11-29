@@ -10,6 +10,7 @@ from typing import (
 )
 
 import aiojobs
+from aiotools import aclosing
 from datetime import datetime
 from dateutil.tz import tzutc
 
@@ -88,6 +89,12 @@ class Publisher:
             await self._connection.send_message(
                 msg.encode(self._serializer))
 
+    async def __aenter__(self) -> None:
+        await self.open()
+
+    async def __aexit__(self, *exc_info) -> None:
+        await self.close()
+
     async def open(self) -> None:
         _opener = functools.partial(self._transport.bind,
                                     self._bind)()
@@ -158,15 +165,33 @@ class Consumer:
     async def _recv_loop(self) -> None:
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
+        if self._scheduler is None:
+            self._scheduler = await aiojobs.create_scheduler(
+                limit=self._max_concurrency,
+            )
+        loop = asyncio.get_running_loop()
         while True:
             try:
-                async for raw_msg in self._connection.recv_message():
-                    if raw_msg is None:
-                        return
-                    msg = PubSubMessage.decode(raw_msg, self._deserializer)
-                    self._incoming_queue.put_nowait(msg)
+                async with aclosing(self._connection.recv_message()) as agen:
+                    async for raw_msg in agen:
+                        if raw_msg is None:
+                            return
+                        msg = PubSubMessage.decode(raw_msg, self._deserializer)
+                        for handler in self._handler_registry:
+                            if (asyncio.iscoroutine(handler) or
+                                    asyncio.iscoroutinefunction(handler)):
+                                await self._scheduler.spawn(handler(msg))
+                            else:
+                                handler = functools.partial(handler, msg)
+                                loop.call_soon(handler)
             except asyncio.CancelledError:
                 break
+
+    async def __aenter__(self) -> None:
+        await self.open()
+
+    async def __aexit__(self, *exc_info) -> None:
+        await self.close()
 
     async def open(self) -> None:
         _opener = functools.partial(self._transport.connect,
@@ -183,23 +208,3 @@ class Consumer:
             await self._recv_task
         if self._transport is not None:
             await self._transport.close()
-
-    async def listen(self) -> None:
-        '''
-        Fetches incoming messages and calls appropriate
-        handlers from "_handler_registry".
-        '''
-        if self._scheduler is None:
-            self._scheduler = await aiojobs.create_scheduler(
-                limit=self._max_concurrency,
-            )
-        loop = asyncio.get_running_loop()
-        while True:
-            msg = await self._incoming_queue.get()
-            for handler in self._handler_registry:
-                if (asyncio.iscoroutine(handler) or
-                        asyncio.iscoroutinefunction(handler)):
-                    await self._scheduler.spawn(handler(msg))
-                else:
-                    handler = functools.partial(handler, msg)
-                    loop.call_soon(handler)

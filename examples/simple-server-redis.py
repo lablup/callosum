@@ -1,5 +1,6 @@
 import asyncio
 import json
+import signal
 import time
 
 from callosum.rpc import Peer
@@ -25,32 +26,28 @@ async def handle_add(request):
 
 
 async def serve():
-    peer = Peer(bind=RedisStreamAddress(
-                    'redis://localhost:6379',
-                    'myservice', 'server-group', 'client1'),
-                transport=RPCRedisTransport,
-                serializer=json.dumps,
-                deserializer=json.loads)
+    peer = Peer(
+        bind=RedisStreamAddress(
+            'redis://localhost:6379',
+            'myservice', 'server-group', 'client1'),
+        transport=RPCRedisTransport,
+        serializer=json.dumps,
+        deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
-    try:
-        await peer.open()
-        await peer.listen()
-    except asyncio.CancelledError:
-        await peer.close()
+
+    loop = asyncio.get_running_loop()
+    forever = loop.create_future()
+    loop.add_signal_handler(signal.SIGINT, forever.cancel)
+    loop.add_signal_handler(signal.SIGTERM, forever.cancel)
+    async with peer:
+        try:
+            print('server started')
+            await forever
+        except asyncio.CancelledError:
+            pass
+    print('server terminated')
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-    try:
-        task = loop.create_task(serve())
-        print('listening...')
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        print('closing...')
-        task.cancel()
-        loop.run_until_complete(task)
-    finally:
-        loop.close()
-        print('closed.')
+    asyncio.run(serve())
