@@ -19,22 +19,21 @@ async def call():
                 transport=ZeroMQTransport,
                 invoke_timeout=2.0)
     adaptor = ThriftClientAdaptor(simple_thrift.SimpleService)
-    await peer.open()
-    response = await peer.invoke(
-        'simple',
-        adaptor.echo(secrets.token_hex(16)))
-    print(f"echoed {response}")
-    response = await peer.invoke(
-        'simple',
-        adaptor.echo(secrets.token_hex(16)))
-    print(f"echoed {response}")
-    a = random.randint(1, 10)
-    b = random.randint(10, 20)
-    response = await peer.invoke(
-        'simple',
-        adaptor.add(a, b))
-    print(f"{a} + {b} = {response}")
-    await peer.close()
+    async with peer:
+        response = await peer.invoke(
+            'simple',
+            adaptor.echo(secrets.token_hex(16)))
+        print(f"echoed {response}")
+        response = await peer.invoke(
+            'simple',
+            adaptor.echo(secrets.token_hex(16)))
+        print(f"echoed {response}")
+        a = random.randint(1, 10)
+        b = random.randint(10, 20)
+        response = await peer.invoke(
+            'simple',
+            adaptor.add(a, b))
+        print(f"{a} + {b} = {response}")
 
 
 if __name__ == '__main__':

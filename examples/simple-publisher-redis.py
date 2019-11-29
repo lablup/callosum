@@ -20,13 +20,13 @@ from callosum.lower.dispatch_redis import (
 
 
 async def publish():
-    pub = Publisher(bind=RedisStreamAddress(
-                    'redis://localhost:6379',
-                    'events'),
-                    serializer=json.dumps,
-                    transport=DispatchRedisTransport)
+    pub = Publisher(
+        bind=RedisStreamAddress(
+            'redis://localhost:6379',
+            'events'),
+        serializer=json.dumps,
+        transport=DispatchRedisTransport)
     agent_id = secrets.token_hex(2)  # publisher id
-    await pub.open()
 
     async def heartbeats():
         for _ in range(10):
@@ -49,14 +49,13 @@ async def publish():
                  datetime.now(tzutc()))
         print("pushed addition event")
 
-    task1 = asyncio.create_task(heartbeats())
-    addend1 = random.randint(1, 10)
-    addend2 = random.randint(10, 20)
-    task2 = asyncio.create_task(addition_event(addend1, addend2))
-    print("waiting for the completion of tasks")
-    await asyncio.gather(task1, task2)
-    print("tasks are completed, closing the publisher")
-    await pub.close()
+    async with pub:
+        task1 = asyncio.create_task(heartbeats())
+        addend1 = random.randint(1, 10)
+        addend2 = random.randint(10, 20)
+        task2 = asyncio.create_task(addition_event(addend1, addend2))
+        await asyncio.gather(task1, task2)
+    print('publisher done')
 
 
 if __name__ == '__main__':
