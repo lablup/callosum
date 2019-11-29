@@ -5,6 +5,8 @@ addons:
   apt:
     packages:
     - libsnappy-dev
+services:
+  - redis-server
 
 stages:
   - name: test
