@@ -1,28 +1,26 @@
 import asyncio
 import json
 import signal
+import sys
 
 from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
-# add the following handler when you want to test how
-# cancellation on invocation timeout works
-'''
-async def handle_echo(request):
+async def handle_long_delay(request):
     try:
-        print("Before async sleep")
-        await asyncio.sleep(1000)
-        print("After async sleep")
+        await asyncio.sleep(5)
         return {
             'received': request.body['sent'],
         }
     except asyncio.CancelledError:
-        print("Task was cancelled successfully")
+        print("handle_long_delay(): cancelled")
         # NOTE: due to strange behaviour of asyncio, I have to reraise
         # otherwise, the task.cancelled() returns False
         raise
-'''
+    else:
+        print("handle_long_delay(): not cancelled!")
+        sys.exit(1)
 
 
 async def handle_echo(request):
@@ -45,6 +43,7 @@ async def serve():
         deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
+    peer.handle_function('long_delay', handle_long_delay)
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()
