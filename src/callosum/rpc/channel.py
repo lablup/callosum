@@ -10,6 +10,7 @@ from typing import (
 import secrets
 
 import aiojobs
+from aiotools import aclosing
 from async_timeout import timeout
 import attr
 
@@ -162,25 +163,27 @@ class Peer:
             )
         while True:
             try:
-                async for raw_msg in self._connection.recv_message():
-                    # TODO: flow-control in transports or peer queues?
-                    if raw_msg is None:
-                        return
-                    msg = RPCMessage.decode(raw_msg, self._deserializer)
-                    if msg.msgtype == RPCMessageTypes.FUNCTION:
-                        func_handler = self._lookup_func(msg.method)
-                        asyncio.create_task(self._func_task(msg, func_handler))
-                    elif msg.msgtype == RPCMessageTypes.CANCEL:
-                        # TODO: change "await" to "create_task"
-                        # and take care of that task tracking/deleting/cancellation.
-                        await self._func_scheduler.cancel(msg.request_id)
-                    elif msg.msgtype == RPCMessageTypes.STREAM:
-                        # TODO: implement
-                        pass
-                        # stream_handler = self._lookup_stream(msg.method)
-                        # asyncio.create_task(self._stream_task(msg, stream_handler))
-                    elif msg.msgtype == RPCMessageTypes.RESULT:
-                        self._invocation_resolver.resolve(msg.request_id, msg)
+                async with aclosing(self._connection.recv_message()) as agen:
+                    async for raw_msg in agen:
+                        # TODO: flow-control in transports or peer queues?
+                        if raw_msg is None:
+                            return
+                        msg = RPCMessage.decode(raw_msg, self._deserializer)
+                        if msg.msgtype == RPCMessageTypes.FUNCTION:
+                            func_handler = self._lookup_func(msg.method)
+                            asyncio.create_task(self._func_task(msg, func_handler))
+                        elif msg.msgtype == RPCMessageTypes.CANCEL:
+                            # TODO: change "await" to "create_task"
+                            # and take care of that task cancellation.
+                            await self._func_scheduler.cancel(msg.request_id)
+                        elif msg.msgtype == RPCMessageTypes.STREAM:
+                            # TODO: implement
+                            pass
+                            # stream_handler = self._lookup_stream(msg.method)
+                            # asyncio.create_task(
+                            #     self._stream_task(msg, stream_handler))
+                        elif msg.msgtype == RPCMessageTypes.RESULT:
+                            self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
             except Exception:
