@@ -30,6 +30,8 @@ from ..lower import (
 )
 from .message import RPCMessage, RPCMessageTypes
 
+log = logging.getLogger(__name__)
+
 
 # TODO: refactor out
 def _wrap_serializer(serializer):
@@ -78,7 +80,6 @@ class Peer:
     _connection: Optional[AbstractConnection]
     _func_registry: MutableMapping[str, FunctionHandler]
     _stream_registry: MutableMapping[str, StreamHandler]
-    _streaming_chunks: asyncio.Queue[RPCMessage]
     _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
@@ -122,7 +123,6 @@ class Peer:
         self._seq_id = 0
 
         # incoming queues
-        self._streaming_chunks = asyncio.Queue()
         self._invocation_resolver = AsyncResolver()
         if scheduler is None:
             scheduler = KeySerializedAsyncScheduler()
@@ -147,12 +147,11 @@ class Peer:
     def unhandle_stream(self, method: str) -> None:
         del self._stream_registry[method]
 
-    def _lookup(self, msgtype, method):
-        if msgtype == RPCMessageTypes.FUNCTION:
-            return self._func_registry[method]
-        elif msgtype == RPCMessageTypes.STREAM:
-            return self._stream_registry[method]
-        raise ValueError('Invalid msgtype')
+    def _lookup_func(self, method: str) -> FunctionHandler:
+        return self._func_registry[method]
+
+    def _lookup_stream(self, method: str) -> StreamHandler:
+        return self._stream_registry[method]
 
     async def _recv_loop(self) -> None:
         if self._connection is None:
@@ -169,37 +168,41 @@ class Peer:
                         return
                     msg = RPCMessage.decode(raw_msg, self._deserializer)
                     if msg.msgtype == RPCMessageTypes.FUNCTION:
-                        handler = self._lookup(msg.msgtype, msg.method)
-                        asyncio.create_task(self._func_task(msg, handler))
+                        func_handler = self._lookup_func(msg.method)
+                        asyncio.create_task(self._func_task(msg, func_handler))
                     elif msg.msgtype == RPCMessageTypes.CANCEL:
                         # TODO: change "await" to "create_task"
                         # and take care of that task tracking/deleting/cancellation.
                         await self._func_scheduler.cancel(msg.request_id)
                     elif msg.msgtype == RPCMessageTypes.STREAM:
-                        self._streaming_chunks.put_nowait(msg)
+                        # TODO: implement
+                        pass
+                        # stream_handler = self._lookup_stream(msg.method)
+                        # asyncio.create_task(self._stream_task(msg, stream_handler))
                     elif msg.msgtype == RPCMessageTypes.RESULT:
                         self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
+            except Exception:
+                log.exception('unexpected error')
 
     async def _send_loop(self) -> None:
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
         while True:
-            msg = await self._outgoing_queue.get()
-            if msg is CLOSED:
+            try:
+                msg = await self._outgoing_queue.get()
+                if msg is CLOSED:
+                    break
+                assert not isinstance(msg, Sentinel)
+                await self._connection.send_message(
+                    msg.encode(self._serializer))
+            except asyncio.CancelledError:
                 break
-            assert not isinstance(msg, Sentinel)
-            await self._connection.send_message(
-                msg.encode(self._serializer))
+            except Exception:
+                log.exception('unexpected error')
 
     async def __aenter__(self) -> None:
-        await self.open()
-
-    async def __aexit__(self, *exc_info) -> None:
-        await self.close()
-
-    async def open(self) -> None:
         if self._connect:
             _opener = functools.partial(self._transport.connect,
                                         self._connect)()
@@ -215,14 +218,14 @@ class Peer:
         self._send_task = asyncio.create_task(self._send_loop())
         self._recv_task = asyncio.create_task(self._recv_loop())
 
-    async def close(self) -> None:
+    async def __aexit__(self, *exc_info) -> None:
         if self._send_task is not None:
             await self._outgoing_queue.put(CLOSED)
             await self._send_task
         if self._recv_task is not None:
             # TODO: pass exception description, e.g. during invoke timeout
             if self._opener is not None:
-                await self._opener.__aexit__(None, None, None)
+                await self._opener.__aexit__(*exc_info)
             self._recv_task.cancel()
             await self._recv_task
         if self._scheduler is not None:
@@ -315,8 +318,6 @@ class Peer:
 
                 # cancel invocation within this peer
                 self._invocation_resolver.cancel(request.request_id)
-
-                await self.close()
                 raise
             except Exception:
                 raise

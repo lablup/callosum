@@ -27,6 +27,8 @@ from ..lower import (
 )
 from .message import PubSubMessage
 
+log = logging.getLogger(__name__)
+
 
 # TODO: refactor out
 def _wrap_serializer(serializer):
@@ -82,27 +84,26 @@ class Publisher:
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
         while True:
-            msg = await self._outgoing_queue.get()
-            if msg is CLOSED:
+            try:
+                msg = await self._outgoing_queue.get()
+                if msg is CLOSED:
+                    break
+                assert not isinstance(msg, Sentinel)
+                await self._connection.send_message(
+                    msg.encode(self._serializer))
+            except asyncio.CancelledError:
                 break
-            assert not isinstance(msg, Sentinel)
-            await self._connection.send_message(
-                msg.encode(self._serializer))
+            except Exception:
+                log.exception('unexpected error')
 
     async def __aenter__(self) -> None:
-        await self.open()
-
-    async def __aexit__(self, *exc_info) -> None:
-        await self.close()
-
-    async def open(self) -> None:
         _opener = functools.partial(self._transport.bind,
                                     self._bind)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._send_task = asyncio.create_task(self._send_loop())
 
-    async def close(self) -> None:
+    async def __aexit__(self, *exc_info) -> None:
         if self._send_task is not None:
             if self._opener is not None:
                 await self._opener.__aexit__(None, None, None)
@@ -186,21 +187,17 @@ class Consumer:
                                 loop.call_soon(handler)
             except asyncio.CancelledError:
                 break
+            except Exception:
+                log.exception('unexpected error')
 
     async def __aenter__(self) -> None:
-        await self.open()
-
-    async def __aexit__(self, *exc_info) -> None:
-        await self.close()
-
-    async def open(self) -> None:
         _opener = functools.partial(self._transport.connect,
                                     self._connect)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._recv_task = asyncio.create_task(self._recv_loop())
 
-    async def close(self) -> None:
+    async def __aexit__(self, *exc_info) -> None:
         if self._recv_task is not None:
             if self._opener is not None:
                 await self._opener.__aexit__(None, None, None)

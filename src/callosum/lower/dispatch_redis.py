@@ -10,13 +10,14 @@ from typing import (
 import aioredis
 import attr
 
+from ..abc import RawHeaderBody
+from ..exceptions import InvalidAddressError
 from . import (
     AbstractAddress,
     AbstractBinder, AbstractConnector,
     AbstractConnection,
     BaseTransport,
 )
-from ..exceptions import InvalidAddressError
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -47,14 +48,14 @@ class DispatchRedisConnection(AbstractConnection):
         self.addr = addr
         self.direction_keys = direction_keys
 
-    async def recv_message(self) -> AsyncGenerator[
-            Optional[Tuple[bytes, bytes]], None]:
+    async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         # assert not self.transport._redis.closed
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
             stream_key = f'{self.addr.stream_key}.{self.direction_keys[0]}'
-        _s = asyncio.shield
+        # _s = asyncio.shield
+        _s = lambda x: x
 
         async def _xack(raw_msg):
             await self.transport._redis.xack(
@@ -77,13 +78,14 @@ class DispatchRedisConnection(AbstractConnection):
         except aioredis.errors.ConnectionForcedCloseError:
             yield None
 
-    async def send_message(self, raw_msg: Tuple[bytes, bytes]) -> None:
+    async def send_message(self, raw_msg: RawHeaderBody) -> None:
         # assert not self.transport._redis.closed
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
             stream_key = f'{self.addr.stream_key}.{self.direction_keys[1]}'
-        _s = asyncio.shield
+        # _s = asyncio.shield
+        _s = lambda x: x
         await _s(self.transport._redis.xadd(
             stream_key, {b'hdr': raw_msg[0], b'msg': raw_msg[1]}))
 

@@ -8,13 +8,14 @@ import attr
 import zmq, zmq.asyncio
 import yarl
 
+from ..abc import RawHeaderBody
+from ..auth import Identity
 from . import (
     AbstractAddress,
     AbstractBinder, AbstractConnector,
     AbstractConnection,
     BaseTransport,
 )
-from ..auth import Identity
 
 ZAP_VERSION = b'1.0'
 
@@ -131,12 +132,12 @@ class ZeroMQConnection(AbstractConnection):
         self.transport = transport
 
     async def recv_message(self) -> AsyncGenerator[
-            Optional[Tuple[bytes, bytes]], None]:
+            Optional[RawHeaderBody], None]:
         assert not self.transport._closed
         raw_msg = await self.transport._pull_sock.recv_multipart()
         yield raw_msg
 
-    async def send_message(self, raw_msg: Tuple[bytes, bytes]):
+    async def send_message(self, raw_msg: RawHeaderBody):
         assert not self.transport._closed
         await self.transport._push_sock.send_multipart(raw_msg)
 

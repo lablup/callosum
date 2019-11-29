@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import abc
-from typing import AsyncGenerator, Optional, Tuple, Type
+from typing import AsyncGenerator, Optional, Type
 
+from ..abc import RawHeaderBody
 from ..auth import AbstractAuthenticator
 
 
@@ -10,11 +11,11 @@ class AbstractMessagingMixin(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def recv_message(self) -> AsyncGenerator[
-            Optional[Tuple[bytes, bytes]], None]:
+            Optional[RawHeaderBody], None]:
         yield None
 
     @abc.abstractmethod
-    async def send_message(self, raw_msg: Tuple[bytes, bytes]) -> None:
+    async def send_message(self, raw_msg: RawHeaderBody) -> None:
         raise NotImplementedError
 
 
