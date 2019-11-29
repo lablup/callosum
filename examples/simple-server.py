@@ -7,6 +7,18 @@ from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
+async def handle_echo(request):
+    return {
+        'received': request.body['sent'],
+    }
+
+
+async def handle_add(request):
+    return {
+        'result': request.body['a'] + request.body['b'],
+    }
+
+
 async def handle_long_delay(request):
     try:
         await asyncio.sleep(5)
@@ -21,18 +33,6 @@ async def handle_long_delay(request):
     else:
         print("handle_long_delay(): not cancelled!")
         sys.exit(1)
-
-
-async def handle_echo(request):
-    return {
-        'received': request.body['sent'],
-    }
-
-
-async def handle_add(request):
-    return {
-        'result': request.body['a'] + request.body['b'],
-    }
 
 
 async def serve():
