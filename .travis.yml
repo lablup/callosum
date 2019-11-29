@@ -26,6 +26,7 @@ script:
   - python -m mypy src examples
   - python -m flake8 src tests examples
   - python -m pytest tests
+  - ./scripts/run-integration-tests.sh
 after_success:
   - codecov
 
