@@ -14,6 +14,7 @@ def read_src_version():
 
 install_requires = [
     'aiojobs>=0.2.2',
+    'aiotools>=0.8.5',
     'async_timeout~=3.0.1',
     'attrs>=19.3.0',
     'python-dateutil>=2.8.1',
