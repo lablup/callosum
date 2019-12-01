@@ -29,12 +29,12 @@ async def handle_long_delay(request):
             'received': request.body['sent'],
         }
     except asyncio.CancelledError:
-        print("handle_long_delay(): cancelled")
+        print(" -> cancelled as expected")
         # NOTE: due to strange behaviour of asyncio, I have to reraise
         # otherwise, the task.cancelled() returns False
         raise
     else:
-        print("handle_long_delay(): not cancelled!")
+        print(" -> not cancelled!")
         sys.exit(1)
 
 
