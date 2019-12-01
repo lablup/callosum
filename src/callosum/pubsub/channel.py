@@ -15,6 +15,7 @@ from datetime import datetime
 from dateutil.tz import tzutc
 
 from ..abc import (
+    AbstractChannel,
     Sentinel, CLOSED,
 )
 from ..auth import AbstractAuthenticator
@@ -48,7 +49,7 @@ def _wrap_deserializer(deserializer):
     return _deserialize
 
 
-class Publisher:
+class Publisher(AbstractChannel):
     '''
     Represents a unidirectional message publisher.
     '''
@@ -96,12 +97,13 @@ class Publisher:
             except Exception:
                 log.exception('unexpected error')
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> Publisher:
         _opener = functools.partial(self._transport.bind,
                                     self._bind)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._send_task = asyncio.create_task(self._send_loop())
+        return self
 
     async def __aexit__(self, *exc_info) -> None:
         if self._send_task is not None:
@@ -119,7 +121,7 @@ class Publisher:
         self._outgoing_queue.put_nowait(msg)
 
 
-class Consumer:
+class Consumer(AbstractChannel):
     '''
     Represents a unidirectional message consumer.
     If no scheduler is provided as a parameter,
@@ -190,12 +192,13 @@ class Consumer:
             except Exception:
                 log.exception('unexpected error')
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> Consumer:
         _opener = functools.partial(self._transport.connect,
                                     self._connect)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._recv_task = asyncio.create_task(self._recv_loop())
+        return self
 
     async def __aexit__(self, *exc_info) -> None:
         if self._recv_task is not None:

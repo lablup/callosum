@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 from typing import (
     Any, Final, Optional,
-    Callable,
     Tuple,
     Protocol,
 )
@@ -13,6 +12,10 @@ RawHeaderBody = Tuple[bytes, bytes]
 
 
 class Sentinel(object):
+    '''
+    A category of special singleton objects that represents
+    control-plane events in data-plane RX/TX queues.
+    '''
     pass
 
 
@@ -23,7 +26,7 @@ CLOSED: Final = Sentinel()
 
 
 '''
-A sentinel object that represents cancellation during RPC requests.
+A sentinel object that represents task cancellation.
 '''
 CANCELLED: Final = Sentinel()
 
@@ -66,5 +69,10 @@ class AbstractMessage(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-FunctionHandler = Callable[..., Any]
-StreamHandler = Callable[..., Any]
+class AbstractChannel(metaclass=abc.ABCMeta):
+
+    async def __aenter__(self) -> AbstractChannel:
+        return self
+
+    async def __aexit__(self, *exc_info) -> None:
+        pass

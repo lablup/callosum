@@ -16,7 +16,7 @@ import attr
 
 from ..abc import (
     Sentinel, CLOSED, CANCELLED,
-    FunctionHandler, StreamHandler,
+    AbstractChannel,
 )
 from ..auth import AbstractAuthenticator
 from .exceptions import RPCUserError, RPCInternalError
@@ -28,6 +28,9 @@ from ..lower import (
     AbstractAddress,
     AbstractConnection,
     BaseTransport,
+)
+from .abc import (
+    FunctionHandler, StreamHandler,
 )
 from .message import (
     RPCMessage, RPCMessageTypes,
@@ -70,7 +73,7 @@ class Tunnel:
         pass
 
 
-class Peer:
+class Peer(AbstractChannel):
     '''
     Represents a bidirectional connection where both sides can invoke each
     other.
@@ -215,7 +218,7 @@ class Peer:
             except Exception:
                 log.exception('unexpected error')
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> Peer:
         if self._connect:
             _opener = functools.partial(self._transport.connect,
                                         self._connect)()
@@ -230,6 +233,7 @@ class Peer:
         # then there will be error after "flushall" redis.
         self._send_task = asyncio.create_task(self._send_loop())
         self._recv_task = asyncio.create_task(self._recv_loop())
+        return self
 
     async def __aexit__(self, *exc_info) -> None:
         if self._send_task is not None:
