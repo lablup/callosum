@@ -198,6 +198,10 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         self._futures[request_id] = fut
         return fut
 
+    async def cleanup(self, request_id):
+        # TODO: implement
+        self._futures.pop(request_id, None)
+
     async def cancel(self, request_id):
         # TODO: implement
         pass
@@ -219,6 +223,3 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
                 break
         if len(self._sequences[okey]) == 0:
             del self._sequences[okey]
-
-    async def cleanup(self, request_id):
-        pass

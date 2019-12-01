@@ -19,7 +19,7 @@ from ..abc import (
     FunctionHandler, StreamHandler,
 )
 from ..auth import AbstractAuthenticator
-from ..exceptions import ServerError, HandlerError
+from .exceptions import RPCUserError, RPCInternalError
 from ..ordering import (
     AsyncResolver, AbstractAsyncScheduler,
     KeySerializedAsyncScheduler, SEQ_BITS,
@@ -29,7 +29,9 @@ from ..lower import (
     AbstractConnection,
     BaseTransport,
 )
-from .message import RPCMessage, RPCMessageTypes
+from .message import (
+    RPCMessage, RPCMessageTypes,
+)
 
 log = logging.getLogger(__name__)
 
@@ -155,6 +157,9 @@ class Peer:
         return self._stream_registry[method]
 
     async def _recv_loop(self) -> None:
+        '''
+        Receive requests and schedule the request handlers.
+        '''
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
         if self._scheduler is None:
@@ -182,7 +187,9 @@ class Peer:
                             # stream_handler = self._lookup_stream(msg.method)
                             # asyncio.create_task(
                             #     self._stream_task(msg, stream_handler))
-                        elif msg.msgtype == RPCMessageTypes.RESULT:
+                        elif msg.msgtype in (RPCMessageTypes.RESULT,
+                                             RPCMessageTypes.FAILURE,
+                                             RPCMessageTypes.ERROR):
                             self._invocation_resolver.resolve(msg.request_id, msg)
             except asyncio.CancelledError:
                 break
@@ -190,6 +197,9 @@ class Peer:
                 log.exception('unexpected error')
 
     async def _send_loop(self) -> None:
+        '''
+        Fetches and sends out the completed task responses.
+        '''
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
         while True:
@@ -242,22 +252,29 @@ class Peer:
                          handler: FunctionHandler):
         rqst_id = request.request_id
         try:
-            await self._func_scheduler.schedule(
-                rqst_id,
-                self._scheduler,
-                handler(request))
-            result = await self._func_scheduler.get_fut(rqst_id)
-            await self._func_scheduler.cleanup(rqst_id)
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+            try:
+                await self._func_scheduler.schedule(
+                    rqst_id,
+                    self._scheduler,
+                    handler(request))
+                result = await self._func_scheduler.get_fut(rqst_id)
+                if result is CANCELLED:
+                    return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # exception from user handler => failure
+                response = RPCMessage.failure(request)
+            else:
+                assert not isinstance(result, Sentinel)
+                response = RPCMessage.result(request, result)
+            finally:
+                await self._func_scheduler.cleanup(rqst_id)
+        except asyncio.CancelledError:
             raise
-        except Exception as e:
-            self._log.error('Uncaught exception')
-            response = RPCMessage.error(request, e)
-        else:
-            if result is CANCELLED:
-                return
-            assert not isinstance(result, Sentinel)
-            response = RPCMessage.result(request, result)
+        except Exception:
+            # exception from our parts => error
+            response = RPCMessage.error(request)
         await self._outgoing_queue.put(response)
 
     async def invoke(self, method: str, body, *,
@@ -270,28 +287,28 @@ class Peer:
         if order_key is None:
             order_key = secrets.token_hex(8)
         self._seq_id = (self._seq_id + 1) % SEQ_BITS
-        with timeout(invoke_timeout):
-            try:
-                request: RPCMessage
+        try:
+            request: RPCMessage
+            with timeout(invoke_timeout):
                 if callable(body):
                     # The user is using an upper-layer adaptor.
-                    agen = body()
-                    request = RPCMessage(
-                        RPCMessageTypes.FUNCTION,
-                        method,
-                        order_key,
-                        self._seq_id,
-                        None,
-                        await agen.asend(None),
-                    )
-                    await self._outgoing_queue.put(request)
-                    response = await self._invocation_resolver.wait(
-                        request.request_id)
-                    upper_result = await agen.asend(response.body)
-                    try:
-                        await agen.asend(None)
-                    except StopAsyncIteration:
-                        pass
+                    async with aclosing(body()) as agen:
+                        request = RPCMessage(
+                            RPCMessageTypes.FUNCTION,
+                            method,
+                            order_key,
+                            self._seq_id,
+                            None,
+                            await agen.asend(None),
+                        )
+                        await self._outgoing_queue.put(request)
+                        response = await self._invocation_resolver.wait(
+                            request.request_id)
+                        upper_result = await agen.asend(response.body)
+                        try:
+                            await agen.asend(None)
+                        except StopAsyncIteration:
+                            pass
                 else:
                     request = RPCMessage(
                         RPCMessageTypes.FUNCTION,
@@ -305,25 +322,22 @@ class Peer:
                     response = await self._invocation_resolver.wait(
                         request.request_id)
                     upper_result = response.body
-                if response.msgtype == RPCMessageTypes.RESULT:
-                    pass
-                elif response.msgtype == RPCMessageTypes.FAILURE:
-                    # TODO: encode/decode error info
-                    raise HandlerError(response.body)
-                elif response.msgtype == RPCMessageTypes.ERROR:
-                    # TODO: encode/decode error info
-                    raise ServerError(response.body)
-                return upper_result
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                # send cancel_request to connected peer
-                cancel_request = RPCMessage.cancel(request)
-                await self._outgoing_queue.put(cancel_request)
-
-                # cancel invocation within this peer
-                self._invocation_resolver.cancel(request.request_id)
-                raise
-            except Exception:
-                raise
+            if response.msgtype == RPCMessageTypes.RESULT:
+                pass
+            elif response.msgtype == RPCMessageTypes.FAILURE:
+                raise RPCUserError(*attr.astuple(response.metadata))
+            elif response.msgtype == RPCMessageTypes.ERROR:
+                raise RPCInternalError(*attr.astuple(response.metadata))
+            return upper_result
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            # propagate cancellation to the connected peer
+            cancel_request = RPCMessage.cancel(request)
+            await self._outgoing_queue.put(cancel_request)
+            # cancel myself as well
+            self._invocation_resolver.cancel(request.request_id)
+            raise
+        except Exception:
+            raise
 
     async def send_stream(self, order_key, metadata, stream, *,
                           reporthook=None):

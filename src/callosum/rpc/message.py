@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import sys
+import traceback
 from typing import Any, Final, Optional
 
 import attr
@@ -68,7 +69,7 @@ class StreamMetadata(Metadata):
 @attr.dataclass(frozen=True, slots=True)
 class ErrorMetadata(Metadata):
     name: str
-    stack: str
+    traceback: str
 
 
 @attr.dataclass(frozen=True, slots=True)
@@ -85,12 +86,13 @@ class RPCMessageTypes(enum.IntEnum):
     CANCEL = 5   # client-side timeout or cancel request
 
 
+# mapped from RPCMessageTypes as index
 metadata_types = (
     FunctionMetadata,
     StreamMetadata,
     ResultMetadata,
     ErrorMetadata,
-    ErrorMetadata,
+    ErrorMetadata,  # intended duplication
     NullMetadata,
 )
 
@@ -105,7 +107,7 @@ class RPCMessage(AbstractMessage):
 
     # body parts (compressable)
     metadata: Optional[Metadata]
-    body: bytes
+    body: Optional[bytes]
 
     @property
     def request_id(self):
@@ -113,6 +115,9 @@ class RPCMessage(AbstractMessage):
 
     @classmethod
     def result(cls, request, result_body):
+        '''
+        Creates an RPCMessage instance represents a execution result.
+        '''
         return cls(
             RPCMessageTypes.RESULT,
             request.method, request.order_key, request.seq_id,
@@ -121,31 +126,49 @@ class RPCMessage(AbstractMessage):
         )
 
     @classmethod
-    def failure(cls, request, exc):
+    def failure(cls, request):
+        '''
+        Creates an RPCMessage instance containing exception information,
+        when the exception is from user-defined handlers or upper adaptation layers.
+
+        It must be called in an exception handler context, where ``sys.exc_info()``
+        returns a non-null tuple.
+        '''
+        exc_info = sys.exc_info()
         return cls(
             RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
-            ErrorMetadata(type(exc).__name__, ''),  # TODO: format stack
-            mpackb(tuple(map(str, exc.args))),
+            ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
+            None,
         )
 
     @classmethod
-    def error(cls, request, exc_info=None):
-        if exc_info is None:
-            exc_info = sys.exc_info()
+    def error(cls, request):
+        '''
+        Creates an RPCMessage instance containing exception information,
+        when the exception is from Callosum's internals.
+
+        It must be called in an exception handler context, where ``sys.exc_info()``
+        returns a non-null tuple.
+        '''
+        exc_info = sys.exc_info()
         return cls(
             RPCMessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
-            ErrorMetadata(exc_info[0].__name__, ''),
-            mpackb(list(map(str, exc_info[1].args))),
+            ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
+            None,
         )
 
     @classmethod
     def cancel(cls, request):
+        '''
+        Creates an RPCMessage instance represents a cancellation of
+        the given request.
+        '''
         return cls(
             RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
-            NullMetadata(), {},
+            NullMetadata(), None,
         )
 
     @classmethod
@@ -161,12 +184,16 @@ class RPCMessage(AbstractMessage):
             raw_data = snappy.decompress(raw_data)
         data = munpackb(raw_data)
         metadata = metadata_types[msgtype].decode(data['meta'])
+        if msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
+            body = deserializer(data['body'])
+        else:
+            body = data['body']
         return cls(msgtype,
                    header['meth'],
                    header['okey'],
                    header['seq'],
                    metadata,
-                   deserializer(data['body']))
+                   body)
 
     def encode(self, serializer: AbstractSerializer, compress: bool = False) \
               -> RawHeaderBody:
@@ -181,9 +208,7 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = mpackb(header)
-        if self.msgtype in (RPCMessageTypes.FUNCTION,
-                            RPCMessageTypes.RESULT,
-                            RPCMessageTypes.CANCEL):
+        if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
             body = serializer(self.body)
         else:
             body = self.body

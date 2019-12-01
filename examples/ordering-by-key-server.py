@@ -3,6 +3,9 @@ import json
 import signal
 
 from callosum.rpc import Peer
+from callosum.ordering import (
+    KeySerializedAsyncScheduler,
+)
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
@@ -29,10 +32,10 @@ async def handle_delimeter(request):
 
 
 async def serve():
-    # Peer will use "KeySerializedAsyncScheduler" by default.
     peer = Peer(
         bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
         transport=ZeroMQTransport,
+        scheduler=KeySerializedAsyncScheduler(),
         serializer=json.dumps,
         deserializer=json.loads)
     peer.handle_function('echo', handle_echo)

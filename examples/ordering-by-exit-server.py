@@ -1,59 +1,50 @@
 import asyncio
 import json
 import signal
-import sys
 
 from callosum.rpc import Peer
+from callosum.ordering import (
+    ExitOrderedAsyncScheduler,
+)
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
 async def handle_echo(request):
-    print("handle_echo()")
+    print('echo start')
+    await asyncio.sleep(1)
+    print('echo done')
     return {
         'received': request.body['sent'],
     }
 
 
 async def handle_add(request):
-    print("handle_add()")
+    print('add start')
+    await asyncio.sleep(0.5)
+    print('add done')
     return {
         'result': request.body['a'] + request.body['b'],
     }
 
 
-async def handle_long_delay(request):
-    print("handle_long_delay()")
-    try:
-        await asyncio.sleep(5)
-        return {
-            'received': request.body['sent'],
-        }
-    except asyncio.CancelledError:
-        print("handle_long_delay(): cancelled")
-        # NOTE: due to strange behaviour of asyncio, I have to reraise
-        # otherwise, the task.cancelled() returns False
-        raise
-    else:
-        print("handle_long_delay(): not cancelled!")
-        sys.exit(1)
-
-
-async def handle_error(request):
-    print("handle_error()")
-    await asyncio.sleep(0.1)
-    raise ZeroDivisionError('ooops')
+async def handle_delimeter(request):
+    print('------')
 
 
 async def serve():
     peer = Peer(
-        bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
+        bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
         transport=ZeroMQTransport,
+        scheduler=ExitOrderedAsyncScheduler(),
         serializer=json.dumps,
         deserializer=json.loads)
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
-    peer.handle_function('long_delay', handle_long_delay)
-    peer.handle_function('error', handle_error)
+    peer.handle_function('print_delim', handle_delimeter)
+
+    print('echo() will take 1 second and add() will take 0.5 second.')
+    print('You can confirm the effect of scheduler '
+          'and the ordering key by the console logs.\n')
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()

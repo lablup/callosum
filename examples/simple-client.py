@@ -3,10 +3,12 @@ import json
 import random
 import secrets
 import sys
+import textwrap
+import traceback
 
 from async_timeout import timeout
 
-from callosum.rpc import Peer
+from callosum.rpc import Peer, RPCUserError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
@@ -15,7 +17,7 @@ async def call():
                 transport=ZeroMQTransport,
                 serializer=json.dumps,
                 deserializer=json.loads,
-                invoke_timeout=2.0)
+                invoke_timeout=5.0)
     async with peer:
         response = await peer.invoke('echo', {
             'sent': secrets.token_hex(16),
@@ -32,6 +34,7 @@ async def call():
             'b': b,
         })
         print(f"{a} + {b} = {response['result']}")
+
         try:
             with timeout(0.5):
                 await peer.invoke('long_delay', {
@@ -41,6 +44,19 @@ async def call():
             print('long_delay(): timeout occurred as expected')
         else:
             print('long_delay(): timeout did not occur!')
+            sys.exit(1)
+
+        try:
+            await peer.invoke('error', {})
+        except RPCUserError as e:
+            print('catched remote error as expected', e.name)
+            print(textwrap.indent(e.traceback, prefix='| '))
+        except Exception:
+            print('error(): did not raise RPCUserError but strange one')
+            traceback.print_exc()
+            sys.exit(1)
+        else:
+            print('error(): did not return exception!')
             sys.exit(1)
 
 

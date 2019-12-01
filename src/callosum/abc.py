@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 from typing import (
-    Any, Final,
+    Any, Final, Optional,
     Callable,
     Tuple,
     Protocol,
@@ -30,13 +30,13 @@ CANCELLED: Final = Sentinel()
 
 class AbstractSerializer(Protocol):
 
-    def __call__(self, obj: Any) -> bytes:
+    def __call__(self, obj: Optional[Any]) -> Optional[bytes]:
         ...
 
 
 class AbstractDeserializer(Protocol):
 
-    def __call__(self, data: bytes) -> Any:
+    def __call__(self, data: Optional[bytes]) -> Optional[Any]:
         ...
 
 

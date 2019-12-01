@@ -26,7 +26,3 @@ class ClientError(CallosumError):
 
 class ServerError(CallosumError):
     pass
-
-
-class HandlerError(CallosumError):
-    pass
