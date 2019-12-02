@@ -28,6 +28,7 @@ build_requires = [
 ]
 
 test_requires = [
+    'Click>=7.0',
     'pytest>=5.2',
     'pytest-asyncio>=0.10',
     'pytest-cov',
@@ -47,7 +48,7 @@ docs_requires = [
 ]
 
 thrift_requires = [
-    'aiothrift',
+    'aiothrift @ git+https://github.com/achimnol/aiothrift',
 ]
 
 zmq_requires = [
