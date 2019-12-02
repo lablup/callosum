@@ -31,24 +31,6 @@ from .message import PubSubMessage
 log = logging.getLogger(__name__)
 
 
-# TODO: refactor out
-def _wrap_serializer(serializer):
-    def _serialize(value):
-        if serializer is not None:
-            value = serializer(value)
-        return value
-    return _serialize
-
-
-# TODO: refactor out
-def _wrap_deserializer(deserializer):
-    def _deserialize(value):
-        if deserializer is not None:
-            value = deserializer(value)
-        return value
-    return _deserialize
-
-
 class Publisher(AbstractChannel):
     '''
     Represents a unidirectional message publisher.
@@ -70,7 +52,7 @@ class Publisher(AbstractChannel):
         self._bind = bind
         self._opener = None
         self._connection = None
-        self._serializer = _wrap_serializer(serializer)
+        self._serializer = serializer
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
@@ -147,7 +129,7 @@ class Consumer(AbstractChannel):
         self._connect = connect
         self._opener = None
         self._connection = None
-        self._deserializer = _wrap_deserializer(deserializer)
+        self._deserializer = deserializer
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,

@@ -39,24 +39,6 @@ from .message import (
 log = logging.getLogger(__name__)
 
 
-# TODO: refactor out
-def _wrap_serializer(serializer):
-    def _serialize(value):
-        if serializer is not None:
-            value = serializer(value)
-        return value
-    return _serialize
-
-
-# TODO: refactor out
-def _wrap_deserializer(deserializer):
-    def _deserialize(value):
-        if deserializer is not None:
-            value = deserializer(value)
-        return value
-    return _deserialize
-
-
 def _identity(val):
     return val
 
@@ -112,8 +94,8 @@ class Peer(AbstractChannel):
         self._opener = None
         self._connection = None
         self._compress = compress
-        self._serializer = _wrap_serializer(serializer)
-        self._deserializer = _wrap_deserializer(deserializer)
+        self._serializer = serializer
+        self._deserializer = deserializer
         self._max_concurrency = max_concurrency
         self._exec_timeout = execute_timeout
         self._invoke_timeout = invoke_timeout
