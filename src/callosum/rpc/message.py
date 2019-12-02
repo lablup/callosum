@@ -177,7 +177,7 @@ class RPCMessage(AbstractMessage):
         header = munpackb(raw_msg[0])
         msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
-        raw_data: bytes = raw_msg[1]
+        raw_data = raw_msg[1]
         if compressed:
             if not has_snappy:
                 raise ConfigurationError('python-snappy is not installed')
@@ -208,6 +208,7 @@ class RPCMessage(AbstractMessage):
             'zip': compress,
         }
         serialized_header: bytes = mpackb(header)
+        body: Optional[bytes]
         if self.msgtype in (RPCMessageTypes.FUNCTION, RPCMessageTypes.RESULT):
             body = serializer(self.body)
         else:

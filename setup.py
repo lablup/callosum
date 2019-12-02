@@ -32,7 +32,7 @@ test_requires = [
     'pytest-asyncio>=0.10',
     'pytest-cov',
     'pytest-mock',
-    'mypy>=0.740',
+    'mypy>=0.750',
     'flake8>=3.7.9',
     'codecov',
 ]

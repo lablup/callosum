@@ -33,13 +33,13 @@ CANCELLED: Final = Sentinel()
 
 class AbstractSerializer(Protocol):
 
-    def __call__(self, obj: Optional[Any]) -> Optional[bytes]:
+    def __call__(self, obj: Optional[Any]) -> bytes:
         ...
 
 
 class AbstractDeserializer(Protocol):
 
-    def __call__(self, data: Optional[bytes]) -> Optional[Any]:
+    def __call__(self, data: bytes) -> Optional[Any]:
         ...
 
 
