@@ -4,7 +4,7 @@ import asyncio
 import functools
 import logging
 from typing import (
-    Any, Callable, Optional, Type, Union,
+    Any, Optional, Type, Union,
     Mapping, MutableMapping,
 )
 import secrets
@@ -17,6 +17,7 @@ import attr
 from ..abc import (
     Sentinel, CLOSED, CANCELLED,
     AbstractChannel,
+    AbstractDeserializer, AbstractSerializer,
 )
 from ..auth import AbstractAuthenticator
 from .exceptions import RPCUserError, RPCInternalError
@@ -66,6 +67,8 @@ class Peer(AbstractChannel):
     '''
 
     _connection: Optional[AbstractConnection]
+    _deserializer: AbstractDeserializer
+    _serializer: AbstractSerializer
     _func_registry: MutableMapping[str, FunctionHandler]
     _stream_registry: MutableMapping[str, StreamHandler]
     _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
@@ -73,10 +76,10 @@ class Peer(AbstractChannel):
     _send_task: Optional[asyncio.Task]
 
     def __init__(self, *,
+                 serializer: AbstractSerializer,
+                 deserializer: AbstractDeserializer,
                  connect: AbstractAddress = None,
                  bind: AbstractAddress = None,
-                 serializer: Callable = None,
-                 deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  transport_opts: Mapping[str, Any] = {},

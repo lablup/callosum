@@ -15,8 +15,9 @@ from datetime import datetime
 from dateutil.tz import tzutc
 
 from ..abc import (
-    AbstractChannel,
     Sentinel, CLOSED,
+    AbstractChannel,
+    AbstractDeserializer, AbstractSerializer,
 )
 from ..auth import AbstractAuthenticator
 from ..lower import (
@@ -40,10 +41,11 @@ class Publisher(AbstractChannel):
     _opener: Optional[AbstractBinder]
     _outgoing_queue: asyncio.Queue[Union[Sentinel, PubSubMessage]]
     _send_task: Optional[asyncio.Task]
+    _serializer: AbstractSerializer
 
     def __init__(self, *,
+                 serializer: AbstractSerializer,
                  bind: AbstractAddress = None,
-                 serializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  transport_opts: Mapping[str, Any] = {}):
@@ -115,10 +117,11 @@ class Consumer(AbstractChannel):
     _opener: Optional[AbstractConnector]
     _incoming_queue: asyncio.Queue[PubSubMessage]
     _recv_task: Optional[asyncio.Task]
+    _deserializer: AbstractDeserializer
 
     def __init__(self, *,
+                 deserializer: AbstractDeserializer,
                  connect: AbstractAddress = None,
-                 deserializer: Callable = None,
                  transport: Type[BaseTransport] = None,
                  authenticator: AbstractAuthenticator = None,
                  transport_opts: Mapping[str, Any] = {},
