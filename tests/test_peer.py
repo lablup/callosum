@@ -1,3 +1,5 @@
+import json
+
 from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
@@ -7,6 +9,8 @@ import pytest
 @pytest.mark.asyncio
 async def test_init():
     p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             serializer=json.dumps,
+             deserializer=json.loads,
              transport=ZeroMQTransport)
 
     assert p._connect.uri == 'tcp://127.0.0.1:5000'
@@ -20,6 +24,8 @@ async def test_init():
 @pytest.mark.asyncio
 async def test_func_registry():
     p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             serializer=json.dumps,
+             deserializer=json.loads,
              transport=ZeroMQTransport)
 
     def dummy():
@@ -36,6 +42,8 @@ async def test_func_registry():
 @pytest.mark.asyncio
 async def test_stream_registry():
     p = Peer(connect=ZeroMQAddress('tcp://127.0.0.1:5000'),
+             serializer=json.dumps,
+             deserializer=json.loads,
              transport=ZeroMQTransport)
 
     def dummy():

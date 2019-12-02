@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from typing import (
-    Any, Optional,
+    Any,
 )
 
 import attr
