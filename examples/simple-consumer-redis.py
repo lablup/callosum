@@ -38,12 +38,12 @@ async def main_handler(msg):
         print("InvalidMessageType: message of type EventTypes was expected.")
 
 
-async def consume():
+async def consume() -> None:
     cons = Consumer(
         connect=RedisStreamAddress(
             'redis://localhost:6379',
             'events', 'consumer-group', 'consumer1'),
-        deserializer=json.loads,
+        deserializer=lambda b: json.loads(b),
         transport=DispatchRedisTransport)
     cons.add_handler(main_handler)
 

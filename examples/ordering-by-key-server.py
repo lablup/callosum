@@ -31,13 +31,13 @@ async def handle_delimeter(request):
     print('------')
 
 
-async def serve():
+async def serve() -> None:
     peer = Peer(
         bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
         transport=ZeroMQTransport,
         scheduler=KeySerializedAsyncScheduler(),
-        serializer=json.dumps,
-        deserializer=json.loads)
+        serializer=lambda o: json.dumps(o).encode('utf8'),
+        deserializer=lambda b: json.loads(b))
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
     peer.handle_function('print_delim', handle_delimeter)

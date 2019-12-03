@@ -3,9 +3,10 @@ import pathlib
 import signal
 
 from callosum.rpc import Peer
+from callosum.serialize import noop_serializer, noop_deserializer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 from callosum.upper.thrift import ThriftServerAdaptor
-import thriftpy
+import thriftpy2 as thriftpy
 
 
 simple_thrift = thriftpy.load(
@@ -20,10 +21,16 @@ class SimpleDispatcher:
     async def add(self, a, b):
         return a + b
 
+    async def oops(self):
+        raise ZeroDivisionError('oops')
 
-async def serve():
-    peer = Peer(bind=ZeroMQAddress('tcp://127.0.0.1:5030'),
-                transport=ZeroMQTransport)
+
+async def serve() -> None:
+    peer = Peer(
+        bind=ZeroMQAddress('tcp://127.0.0.1:5030'),
+        serializer=noop_serializer,
+        deserializer=noop_deserializer,
+        transport=ZeroMQTransport)
     adaptor = ThriftServerAdaptor(
         peer,
         simple_thrift.SimpleService,

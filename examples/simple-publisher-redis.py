@@ -19,17 +19,17 @@ from callosum.lower.dispatch_redis import (
 )
 
 
-async def publish():
+async def publish() -> None:
     pub = Publisher(
         bind=RedisStreamAddress(
             'redis://localhost:6379',
             'events'),
-        serializer=json.dumps,
+        serializer=lambda d: json.dumps(d).encode('utf8'),
         transport=DispatchRedisTransport)
     agent_id = secrets.token_hex(2)  # publisher id
 
     async def heartbeats():
-        for _ in range(10):
+        for _ in range(3):
             await asyncio.sleep(1)
             msg_body = {
                 'type': "instance_heartbeat",
@@ -40,7 +40,7 @@ async def publish():
             print("pushed heartbeat")
 
     async def addition_event(addend1: int, addend2: int):
-        await asyncio.sleep(3)
+        await asyncio.sleep(1.5)
         msg_body = {
             'type': "number_addition",
             'addends': (addend1, addend2),

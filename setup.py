@@ -48,7 +48,7 @@ docs_requires = [
 ]
 
 thrift_requires = [
-    'aiothrift @ git+https://github.com/achimnol/aiothrift',
+    'thriftpy2>=0.4.9',
 ]
 
 zmq_requires = [

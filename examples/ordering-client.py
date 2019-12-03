@@ -5,12 +5,12 @@ from callosum.rpc import Peer
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
-async def call():
+async def call() -> None:
     peer = Peer(
         connect=ZeroMQAddress('tcp://localhost:5010'),
         transport=ZeroMQTransport,
-        serializer=json.dumps,
-        deserializer=json.loads,
+        serializer=lambda o: json.dumps(o).encode('utf8'),
+        deserializer=lambda b: json.loads(b),
         invoke_timeout=5.0)
     async with peer:
         print('Check the server log to see in which order echo/add are executed.\n')

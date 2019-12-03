@@ -199,12 +199,17 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         return fut
 
     async def cleanup(self, request_id):
-        # TODO: implement
         self._futures.pop(request_id, None)
 
     async def cancel(self, request_id):
-        # TODO: implement
-        pass
+        method, okey, seq = request_id
+        removed_req_ids = []
+        for pending_req_id, fut in self._futures.items():
+            if pending_req_id == request_id:
+                fut.cancel()
+                removed_req_ids.append(request_id)
+        for req_id in removed_req_ids:
+            del self._futures[req_id]
 
     def _resolve(self, request_id, result):
         method, okey, seq = request_id

@@ -43,6 +43,11 @@ class AbstractDeserializer(Protocol):
         ...
 
 
+# FIXME: python/mypy#8058
+# AbstractSerializer = Callable[[Optional[Any]], bytes]
+# AbstractDeserializer = Callable[[bytes], Optional[Any]]
+
+
 class AbstractMessage(metaclass=abc.ABCMeta):
 
     @classmethod

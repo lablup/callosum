@@ -1,25 +1,29 @@
+from __future__ import annotations
+
 import functools
 
+from ..rpc import Peer, RPCMessage
 
-class BaseServerAdaptor:
+
+class BaseRPCServerAdaptor:
 
     __slots__ = ('peer', )
 
-    def __init__(self, peer):
+    def __init__(self, peer: Peer):
         self.peer = peer
 
-    async def handle_function(self, request) -> bytes:
+    async def handle_function(self, request: RPCMessage) -> bytes:
         '''
         Implements upper-layer handling of incoming requests and generation of raw
         responses in bytes (= already serialized in the upper layer).
         '''
         raise NotImplementedError
 
-    async def handle_stream(self, request) -> bytes:
+    async def handle_stream(self, request: RPCMessage) -> bytes:
         raise NotImplementedError
 
 
-class BaseClientAdaptor:
+class BaseRPCClientAdaptor:
 
     __slots__ = ()
 

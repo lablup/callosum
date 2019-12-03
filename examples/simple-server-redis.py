@@ -25,14 +25,14 @@ async def handle_add(request):
     }
 
 
-async def serve():
+async def serve() -> None:
     peer = Peer(
         bind=RedisStreamAddress(
             'redis://localhost:6379',
             'myservice', 'server-group', 'client1'),
         transport=RPCRedisTransport,
-        serializer=json.dumps,
-        deserializer=json.loads)
+        serializer=lambda o: json.dumps(o).encode('utf8'),
+        deserializer=lambda b: json.loads(b))
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
 

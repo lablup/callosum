@@ -2,9 +2,21 @@ import asyncio
 import json
 import signal
 import sys
+from typing import Mapping, Type
 
+import click
 from callosum.rpc import Peer
+from callosum.ordering import (
+    AbstractAsyncScheduler,
+    ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler,
+)
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+
+
+scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
+    'key-serialized': KeySerializedAsyncScheduler,
+    'exit-ordered': ExitOrderedAsyncScheduler,
+}
 
 
 async def handle_echo(request):
@@ -44,12 +56,14 @@ async def handle_error(request):
     raise ZeroDivisionError('ooops')
 
 
-async def serve():
+async def serve(scheduler_type: str) -> None:
+    sched_cls = scheduler_types[scheduler_type]
     peer = Peer(
         bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
         transport=ZeroMQTransport,
-        serializer=json.dumps,
-        deserializer=json.loads)
+        scheduler=sched_cls(),
+        serializer=lambda o: json.dumps(o).encode('utf8'),
+        deserializer=lambda b: json.loads(b))
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
     peer.handle_function('long_delay', handle_long_delay)
@@ -68,5 +82,12 @@ async def serve():
     print('server terminated')
 
 
+@click.command()
+@click.argument('scheduler_type',
+                type=click.Choice(scheduler_types.keys()))
+def main(scheduler_type):
+    asyncio.run(serve(scheduler_type))
+
+
 if __name__ == '__main__':
-    asyncio.run(serve())
+    main()

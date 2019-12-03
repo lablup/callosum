@@ -12,12 +12,13 @@ from callosum.rpc import Peer, RPCUserError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
 
 
-async def call():
-    peer = Peer(connect=ZeroMQAddress('tcp://localhost:5020'),
-                transport=ZeroMQTransport,
-                serializer=json.dumps,
-                deserializer=json.loads,
-                invoke_timeout=2.0)
+async def call() -> None:
+    peer = Peer(
+        connect=ZeroMQAddress('tcp://localhost:5020'),
+        transport=ZeroMQTransport,
+        serializer=lambda o: json.dumps(o).encode('utf8'),
+        deserializer=lambda b: json.loads(b),
+        invoke_timeout=2.0)
     async with peer:
         response = await peer.invoke('echo', {
             'sent': secrets.token_hex(16),

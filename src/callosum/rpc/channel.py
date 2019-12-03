@@ -76,8 +76,8 @@ class Peer(AbstractChannel):
     _send_task: Optional[asyncio.Task]
 
     def __init__(self, *,
-                 serializer: AbstractSerializer,
                  deserializer: AbstractDeserializer,
+                 serializer: AbstractSerializer,
                  connect: AbstractAddress = None,
                  bind: AbstractAddress = None,
                  transport: Type[BaseTransport] = None,
@@ -97,8 +97,8 @@ class Peer(AbstractChannel):
         self._opener = None
         self._connection = None
         self._compress = compress
-        self._serializer = serializer
         self._deserializer = deserializer
+        self._serializer = serializer
         self._max_concurrency = max_concurrency
         self._exec_timeout = execute_timeout
         self._invoke_timeout = invoke_timeout
