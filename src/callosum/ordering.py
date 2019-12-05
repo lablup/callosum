@@ -26,7 +26,10 @@ def _resolve_future(request_id, fut, result, log):
         if fut.exception() is not None:
             log.debug('resolved errored request: %r', request_id)
         return
-    fut.set_result(result)
+    if isinstance(result, BaseException):
+        fut.set_exception(result)
+    else:
+        fut.set_result(result)
 
 
 class AsyncResolver:
@@ -108,9 +111,11 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
         heapq.heappush(self._pending[okey], _SeqItem(method, seq, ev))
 
         while True:
+            assert len(self._pending[okey]) > 0
             s = self._pending[okey][0]
             if s.seq == seq:
                 break
+            # Wait until the head item finishes.
             await s.ev.wait()
 
         job = await scheduler.spawn(coro)
@@ -122,49 +127,46 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             fut = self.get_fut(rqst_id)
             if task.cancelled():
                 result = CANCELLED
+                # already removed from the pending heap
                 _resolve_future(rqst_id, fut, result, self._log)
             else:
-                _resolve_future(rqst_id, fut, task.result(), self._log)
                 heapq.heappop(self._pending[okey])
-            self.remove_if_empty(okey)
+                if task.exception() is not None:
+                    _resolve_future(rqst_id, fut, task.exception(), self._log)
+                else:
+                    _resolve_future(rqst_id, fut, task.result(), self._log)
 
         job._task.add_done_callback(functools.partial(cb, s, request_id))
-        await job.wait()
 
     def get_fut(self, request_id) -> asyncio.Future:
         return self._futures[request_id]
 
     async def cleanup(self, request_id):
         self._futures.pop(request_id)
+        self.remove_if_empty(request_id[1])
         if request_id in self._jobs:
-            self._jobs.pop(request_id)
+            self._jobs.pop(request_id, None)
 
     async def cancel(self, request_id):
         method, okey, seq = request_id
         if request_id in self._futures:
+            for seq_item in self._pending[okey]:
+                if seq_item.method == method and seq_item.seq == seq:
+                    self._pending[okey].remove(seq_item)
             if self._pending[okey]:
-                pending_items = self._pending[okey]
-                for seq_item in pending_items:
-                    if seq_item.method == method and seq_item.seq == seq:
-                        pending_items.remove(seq_item)
-                        self.remove_if_empty(okey)
+                heapq.heapify(self._pending[okey])
+            else:
+                del self._pending[okey]
             job = self._jobs.get(request_id, None)
             if job:
-                '''
-                According to source code, calling
-                "await job.close()" includes:
-                - "job._task.cancel()"
-                - "await job._task"
-                So everything is taken care of in one command.
-                '''
+                # aiojobs cancels the internal task upon job closing.
                 await job.close()
         else:
             self._log.warning('cancellation of unknown or '
                               'not sent yet request: %r', request_id)
 
     def remove_if_empty(self, okey):
-        if len(self._pending[okey]) == 0:
-            # TODO: check if pending is cleared
+        if okey in self._pending and len(self._pending[okey]) == 0:
             del self._pending[okey]
 
 

@@ -28,6 +28,7 @@ from ..ordering import (
 from ..lower import (
     AbstractAddress,
     AbstractConnection,
+    AbstractBinder, AbstractConnector,
     BaseTransport,
 )
 from .abc import (
@@ -74,6 +75,7 @@ class Peer(AbstractChannel):
     _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
+    _opener: Optional[Union[AbstractBinder, AbstractConnector]]
 
     def __init__(self, *,
                  deserializer: AbstractDeserializer,
@@ -204,6 +206,7 @@ class Peer(AbstractChannel):
                 log.exception('unexpected error')
 
     async def __aenter__(self) -> Peer:
+        _opener: Union[AbstractBinder, AbstractConnector]
         if self._connect:
             _opener = functools.partial(self._transport.connect,
                                         self._connect)()
@@ -241,11 +244,11 @@ class Peer(AbstractChannel):
                          handler: FunctionHandler):
         rqst_id = request.request_id
         try:
+            await self._func_scheduler.schedule(
+                rqst_id,
+                self._scheduler,
+                handler(request))
             try:
-                await self._func_scheduler.schedule(
-                    rqst_id,
-                    self._scheduler,
-                    handler(request))
                 result = await self._func_scheduler.get_fut(rqst_id)
                 if result is CANCELLED:
                     return

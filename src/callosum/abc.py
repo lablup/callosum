@@ -13,7 +13,7 @@ import attr
 class RawHeaderBody(NamedTuple):
     header: bytes
     body: bytes
-    transport_annotation: Optional[bytes]
+    peer_id: Optional[bytes]
 
 
 class Sentinel(object):
@@ -38,25 +38,20 @@ CANCELLED: Final = Sentinel()
 
 class AbstractSerializer(Protocol):
 
-    def __call__(self, obj: Optional[Any], /) -> bytes:
+    def __call__(self, obj: Optional[Any], /) -> bytes:  # noqa: E225
         ...
 
 
 class AbstractDeserializer(Protocol):
 
-    def __call__(self, data: bytes, /) -> Optional[Any]:
+    def __call__(self, data: bytes, /) -> Optional[Any]:  # noqa: E225
         ...
-
-
-# FIXME: python/mypy#8058
-# AbstractSerializer = Callable[[Optional[Any]], bytes]
-# AbstractDeserializer = Callable[[bytes], Optional[Any]]
 
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class AbstractMessage(metaclass=abc.ABCMeta):
 
-    transport_annotation: Optional[bytes]
+    peer_id: Optional[Any]
 
     @classmethod
     @abc.abstractmethod

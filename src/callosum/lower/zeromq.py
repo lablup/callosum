@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import AsyncGenerator, Optional, Tuple, Union
+from typing import (
+    AsyncGenerator,
+    ClassVar, Type,
+    Optional, Tuple, Union,
+)
 
 import attr
 import zmq, zmq.asyncio
@@ -15,7 +19,6 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
-from ..serialize import mpackb, munpackb
 
 ZAP_VERSION = b'1.0'
 
@@ -122,15 +125,14 @@ class ZAPServer:
         await self._zap_socket.send_multipart(reply)
 
 
-class ZeroMQConnection(AbstractConnection):
+class ZeroMQRPCConnection(AbstractConnection):
 
-    __slots__ = ('transport', 'peer_id')
+    __slots__ = ('transport')
 
-    transport: ZeroMQTransport
+    transport: ZeroMQRPCTransport
 
-    def __init__(self, transport, peer_id: bytes = None):
+    def __init__(self, transport):
         self.transport = transport
-        self.peer_id = peer_id
 
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         assert not self.transport._closed
@@ -145,7 +147,7 @@ class ZeroMQConnection(AbstractConnection):
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
         assert not self.transport._closed
-        peer_id = raw_msg.transport_annotation
+        peer_id = raw_msg.peer_id
         if peer_id is not None:
             # server
             await self.transport._sock.send_multipart([
@@ -158,17 +160,19 @@ class ZeroMQConnection(AbstractConnection):
             ])
 
 
-class ZeroMQBinder(AbstractBinder):
+class ZeroMQBaseBinder(AbstractBinder):
 
     __slots__ = ('transport', 'addr')
 
-    transport: ZeroMQTransport
+    socket_type: ClassVar[int] = 0
+
+    transport: ZeroMQBaseTransport
     addr: ZeroMQAddress
 
     async def __aenter__(self):
         if not self.transport._closed:
-            return ZeroMQConnection(self.transport)
-        server_sock = self.transport._zctx.socket(zmq.ROUTER)
+            return ZeroMQRPCConnection(self.transport)
+        server_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             server_id = await self.transport.authenticator.server_identity()
             server_sock.zap_domain = server_id.domain.encode('utf8')
@@ -178,23 +182,25 @@ class ZeroMQBinder(AbstractBinder):
             server_sock.setsockopt(key, value)
         server_sock.bind(self.addr.uri)
         self.transport._sock = server_sock
-        return ZeroMQConnection(self.transport)
+        return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         pass
 
 
-class ZeroMQConnector(AbstractConnector):
+class ZeroMQBaseConnector(AbstractConnector):
 
     __slots__ = ('transport', 'addr')
 
-    transport: ZeroMQTransport
+    socket_type: ClassVar[int] = 0
+
+    transport: ZeroMQBaseTransport
     addr: ZeroMQAddress
 
     async def __aenter__(self):
         if not self.transport._closed:
-            return ZeroMQConnection(self.transport)
-        client_sock = self.transport._zctx.socket(zmq.DEALER)
+            return ZeroMQRPCConnection(self.transport)
+        client_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             auth = self.transport.authenticator
             client_id = await auth.client_identity()
@@ -207,15 +213,50 @@ class ZeroMQConnector(AbstractConnector):
         for key, value in self.transport._zsock_opts.items():
             client_sock.setsockopt(key, value)
         client_sock.connect(self.addr.uri)
-        peer_id = client_sock.get(zmq.IDENTITY)
         self.transport._sock = client_sock
-        return ZeroMQConnection(self.transport, peer_id)
+        return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         pass
 
 
-class ZeroMQTransport(BaseTransport):
+class ZeroMQRouterBinder(ZeroMQBaseBinder):
+
+    socket_type: ClassVar[int] = zmq.ROUTER
+    transport: ZeroMQRPCTransport
+
+
+class ZeroMQDealerConnector(ZeroMQBaseConnector):
+
+    socket_type: ClassVar[int] = zmq.DEALER
+    transport: ZeroMQRPCTransport
+
+
+class ZeroMQPushBinder(ZeroMQBaseBinder):
+
+    socket_type: ClassVar[int] = zmq.PUSH
+    transport: ZeroMQDistributorTransport
+
+
+class ZeroMQPullConnector(ZeroMQBaseConnector):
+
+    socket_type: ClassVar[int] = zmq.PULL
+    transport: ZeroMQDistributorTransport
+
+
+class ZeroMQPubBinder(ZeroMQBaseBinder):
+
+    socket_type: ClassVar[int] = zmq.PUB
+    transport: ZeroMQBroadcastTransport
+
+
+class ZeroMQSubConnector(ZeroMQBaseConnector):
+
+    socket_type: ClassVar[int] = zmq.SUB
+    transport: ZeroMQBroadcastTransport
+
+
+class ZeroMQBaseTransport(BaseTransport):
 
     '''
     Implementation for the ZeorMQ-backed transport.
@@ -231,8 +272,8 @@ class ZeroMQTransport(BaseTransport):
         '_sock',
     )
 
-    binder_cls = ZeroMQBinder
-    connector_cls = ZeroMQConnector
+    binder_cls: ClassVar[Type[ZeroMQBaseBinder]]
+    connector_cls: ClassVar[Type[ZeroMQBaseConnector]]
 
     def __init__(self, authenticator, **kwargs):
         loop = asyncio.get_running_loop()
@@ -265,3 +306,21 @@ class ZeroMQTransport(BaseTransport):
             await self._zap_task
         if self._zctx is not None:
             self._zctx.term()
+
+
+class ZeroMQRPCTransport(ZeroMQBaseTransport):
+
+    binder_cls = ZeroMQRouterBinder
+    connector_cls = ZeroMQDealerConnector
+
+
+class ZeroMQDistributorTransport(ZeroMQBaseTransport):
+
+    binder_cls = ZeroMQPushBinder
+    connector_cls = ZeroMQPullConnector
+
+
+class ZeroMQBroadcastTransport(ZeroMQBaseTransport):
+
+    binder_cls = ZeroMQPubBinder
+    connector_cls = ZeroMQSubConnector

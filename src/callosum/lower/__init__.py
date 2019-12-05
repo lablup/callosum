@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import abc
-from typing import AsyncGenerator, Optional, Type
+from typing import (
+    AsyncGenerator, ClassVar,
+    Optional, Type,
+)
 
 from ..abc import RawHeaderBody
 from ..auth import AbstractAuthenticator
@@ -42,7 +45,7 @@ class AbstractBinder(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport, addr):
+    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
         self.transport = transport
         self.addr = addr
 
@@ -65,7 +68,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport, addr):
+    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
         self.transport = transport
         self.addr = addr
 
@@ -86,23 +89,24 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
 class BaseTransport(metaclass=abc.ABCMeta):
 
+    binder_cls: ClassVar[Type[AbstractBinder]]
+    connector_cls: ClassVar[Type[AbstractConnector]]
+
     __slots__ = ('authenticator', )
 
-    authenticator: AbstractAuthenticator
+    authenticator: Optional[AbstractAuthenticator]
 
-    binder_cls: Type[AbstractBinder]
-    connector_cls: Type[AbstractConnector]
-
-    def __init__(self, authenticator, **kwargs):
+    def __init__(self, authenticator: AbstractAuthenticator = None,
+                 **kwargs) -> None:
         self.authenticator = authenticator
 
-    def bind(self, bind_addr):
-        return self.binder_cls(self, bind_addr)
+    def bind(self, bind_addr: AbstractAddress) -> AbstractBinder:
+        return type(self).binder_cls(self, bind_addr)
 
-    def connect(self, connect_addr):
-        return self.connector_cls(self, connect_addr)
+    def connect(self, connect_addr: AbstractAddress) -> AbstractConnector:
+        return type(self).connector_cls(self, connect_addr)
 
-    async def close(self):
+    async def close(self) -> None:
         '''
         Close all open connections and release system resources.
         This may be left empty for transports without connection pooling or

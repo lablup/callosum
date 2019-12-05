@@ -119,7 +119,7 @@ class RPCMessage(AbstractMessage):
         Creates an RPCMessage instance represents a execution result.
         '''
         return cls(
-            request.transport_annotation,
+            request.peer_id,
             RPCMessageTypes.RESULT,
             request.method, request.order_key, request.seq_id,
             ResultMetadata(),
@@ -137,7 +137,7 @@ class RPCMessage(AbstractMessage):
         '''
         exc_info = sys.exc_info()
         return cls(
-            request.transport_annotation,
+            request.peer_id,
             RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
@@ -155,7 +155,7 @@ class RPCMessage(AbstractMessage):
         '''
         exc_info = sys.exc_info()
         return cls(
-            request.transport_annotation,
+            request.peer_id,
             RPCMessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
@@ -169,7 +169,7 @@ class RPCMessage(AbstractMessage):
         the given request.
         '''
         return cls(
-            request.transport_annotation,
+            request.peer_id,
             RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
             NullMetadata(), None,
@@ -193,7 +193,7 @@ class RPCMessage(AbstractMessage):
         else:
             body = data['body']
         return cls(
-            raw_msg.transport_annotation,
+            raw_msg.peer_id,
             msgtype,
             header['meth'],
             header['okey'],
@@ -232,5 +232,5 @@ class RPCMessage(AbstractMessage):
         return RawHeaderBody(
             serialized_header,
             serialized_data,
-            self.transport_annotation,
+            self.peer_id,
         )

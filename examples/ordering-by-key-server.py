@@ -6,7 +6,7 @@ from callosum.rpc import Peer
 from callosum.ordering import (
     KeySerializedAsyncScheduler,
 )
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 
 async def handle_echo(request):
@@ -34,7 +34,7 @@ async def handle_delimeter(request):
 async def serve() -> None:
     peer = Peer(
         bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
-        transport=ZeroMQTransport,
+        transport=ZeroMQRPCTransport,
         scheduler=KeySerializedAsyncScheduler(),
         serializer=lambda o: json.dumps(o).encode('utf8'),
         deserializer=lambda b: json.loads(b))

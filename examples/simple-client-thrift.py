@@ -6,7 +6,7 @@ import textwrap
 
 from callosum.rpc import Peer, RPCUserError
 from callosum.serialize import noop_serializer, noop_deserializer
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.upper.thrift import ThriftClientAdaptor
 import thriftpy2 as thriftpy
 
@@ -19,7 +19,7 @@ simple_thrift = thriftpy.load(
 async def call() -> None:
     peer = Peer(
         connect=ZeroMQAddress('tcp://localhost:5030'),
-        transport=ZeroMQTransport,
+        transport=ZeroMQRPCTransport,
         serializer=noop_serializer,
         deserializer=noop_deserializer,
         invoke_timeout=2.0)

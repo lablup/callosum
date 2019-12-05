@@ -2,6 +2,7 @@ import asyncio
 import json
 import signal
 import sys
+import tracemalloc
 from typing import Mapping, Type
 
 import click
@@ -10,7 +11,7 @@ from callosum.ordering import (
     AbstractAsyncScheduler,
     ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler,
 )
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 
 scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
@@ -18,62 +19,110 @@ scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
     'exit-ordered': ExitOrderedAsyncScheduler,
 }
 
+last_snapshot = None
+show_output = True
+scheduler = None
+
 
 async def handle_echo(request):
-    print("handle_echo()")
+    if show_output:
+        print("handle_echo()")
     return {
         'received': request.body['sent'],
     }
 
 
 async def handle_add(request):
-    print("handle_add()")
+    if show_output:
+        print("handle_add()")
     return {
         'result': request.body['a'] + request.body['b'],
     }
 
 
+async def handle_output(request):
+    global show_output
+    show_output = request.body['enabled']
+    return {}
+
+
+async def handle_show_memory_stat(request):
+    global last_snapshot, scheduler
+    last_snapshot = last_snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, tracemalloc.__file__),
+    ))
+    new_snapshot = tracemalloc.take_snapshot().filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, tracemalloc.__file__),
+    ))
+    top_stats = new_snapshot.compare_to(last_snapshot, 'lineno')
+    last_snapshot = new_snapshot
+    print("[ Top 10 differences ]")
+    for stat in top_stats[:10]:
+        print(stat)
+    print("[ Scheduler Queue Status ]")
+    print('_jobs', len(scheduler._jobs))
+    print('_futures', len(scheduler._futures))
+    if hasattr(scheduler, '_pending'):
+        print('_pending', len(scheduler._pending))
+        print(scheduler._pending)
+    return {}
+
+
 async def handle_long_delay(request):
-    print("handle_long_delay()")
+    if show_output:
+        print("handle_long_delay()")
     try:
         await asyncio.sleep(5)
         return {
             'received': request.body['sent'],
         }
     except asyncio.CancelledError:
-        print(" -> cancelled as expected")
+        if show_output:
+            print(" -> cancelled as expected")
         # NOTE: due to strange behaviour of asyncio, I have to reraise
         # otherwise, the task.cancelled() returns False
         raise
     else:
-        print(" -> not cancelled!")
+        if show_output:
+            print(" -> not cancelled!")
         sys.exit(1)
 
 
 async def handle_error(request):
-    print("handle_error()")
+    if show_output:
+        print("handle_error()")
     await asyncio.sleep(0.1)
     raise ZeroDivisionError('ooops')
 
 
 async def serve(scheduler_type: str) -> None:
+    global last_snapshot, scheduler
+
     sched_cls = scheduler_types[scheduler_type]
+    scheduler = sched_cls()
     peer = Peer(
         bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
-        transport=ZeroMQTransport,
-        scheduler=sched_cls(),
+        transport=ZeroMQRPCTransport,
+        scheduler=scheduler,
         serializer=lambda o: json.dumps(o).encode('utf8'),
         deserializer=lambda b: json.loads(b))
     peer.handle_function('echo', handle_echo)
     peer.handle_function('add', handle_add)
     peer.handle_function('long_delay', handle_long_delay)
     peer.handle_function('error', handle_error)
+    peer.handle_function('set_output', handle_output)
+    peer.handle_function('memstat', handle_show_memory_stat)
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()
     loop.add_signal_handler(signal.SIGINT, forever.cancel)
     loop.add_signal_handler(signal.SIGTERM, forever.cancel)
+
+    tracemalloc.start(10)
     async with peer:
+        last_snapshot = tracemalloc.take_snapshot()
         try:
             print('server started')
             await forever

@@ -65,7 +65,7 @@ class RPCRedisConnection(AbstractConnection):
                 if b'meta' in raw_msg[2]:
                     await _s(_xack(raw_msg))
                     continue
-                yield raw_msg[2][b'hdr'], raw_msg[2][b'msg']
+                yield RawHeaderBody(raw_msg[2][b'hdr'], raw_msg[2][b'msg'], None)
                 await _s(_xack(raw_msg))
         except asyncio.CancelledError:
             raise

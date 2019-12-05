@@ -20,6 +20,7 @@ def test_metadata_serialization():
 
 def test_rpcmessage_exception_serialization():
     request = RPCMessage(
+        peer_id=None,
         msgtype=RPCMessageTypes.FUNCTION,
         method='dummy_function',
         order_key='x',

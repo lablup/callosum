@@ -4,7 +4,7 @@ import signal
 
 from callosum.rpc import Peer
 from callosum.serialize import noop_serializer, noop_deserializer
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQTransport
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.upper.thrift import ThriftServerAdaptor
 import thriftpy2 as thriftpy
 
@@ -30,7 +30,7 @@ async def serve() -> None:
         bind=ZeroMQAddress('tcp://127.0.0.1:5030'),
         serializer=noop_serializer,
         deserializer=noop_deserializer,
-        transport=ZeroMQTransport)
+        transport=ZeroMQRPCTransport)
     adaptor = ThriftServerAdaptor(
         peer,
         simple_thrift.SimpleService,
