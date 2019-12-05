@@ -13,6 +13,7 @@ do_test() {
 do_test simple-server.py simple-client.py
 # TODO: fix up Redis RPC
 # do_test simple-server-redis.py simple-client-redis.py
+# do_test simple-server-thrift.py simple-client-thrift.py
 do_test ordering-by-exit-server.py ordering-client.py
 do_test ordering-by-key-server.py ordering-client.py
 do_test simple-consumer-redis.py simple-publisher-redis.py

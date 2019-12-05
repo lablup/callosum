@@ -84,6 +84,7 @@ async def serve(scheduler_type: str) -> None:
 
 @click.command()
 @click.argument('scheduler_type',
+                default='key-serialized',
                 type=click.Choice(scheduler_types.keys()))
 def main(scheduler_type):
     asyncio.run(serve(scheduler_type))

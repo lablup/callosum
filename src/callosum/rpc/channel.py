@@ -283,6 +283,7 @@ class Peer(AbstractChannel):
                     # The user is using an upper-layer adaptor.
                     async with aclosing(body()) as agen:
                         request = RPCMessage(
+                            None,
                             RPCMessageTypes.FUNCTION,
                             method,
                             order_key,
@@ -300,6 +301,7 @@ class Peer(AbstractChannel):
                             pass
                 else:
                     request = RPCMessage(
+                        None,
                         RPCMessageTypes.FUNCTION,
                         method,
                         order_key,

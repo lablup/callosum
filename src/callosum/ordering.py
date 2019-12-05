@@ -159,8 +159,8 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
                 '''
                 await job.close()
         else:
-            self._log.warning('cancellation of unknown or \
-                               not sent yet request: %r', request_id)
+            self._log.warning('cancellation of unknown or '
+                              'not sent yet request: %r', request_id)
 
     def remove_if_empty(self, okey):
         if len(self._pending[okey]) == 0:

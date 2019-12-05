@@ -119,6 +119,7 @@ class RPCMessage(AbstractMessage):
         Creates an RPCMessage instance represents a execution result.
         '''
         return cls(
+            request.transport_annotation,
             RPCMessageTypes.RESULT,
             request.method, request.order_key, request.seq_id,
             ResultMetadata(),
@@ -136,6 +137,7 @@ class RPCMessage(AbstractMessage):
         '''
         exc_info = sys.exc_info()
         return cls(
+            request.transport_annotation,
             RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
@@ -153,6 +155,7 @@ class RPCMessage(AbstractMessage):
         '''
         exc_info = sys.exc_info()
         return cls(
+            request.transport_annotation,
             RPCMessageTypes.ERROR,
             request.method, request.order_key, request.seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
@@ -166,6 +169,7 @@ class RPCMessage(AbstractMessage):
         the given request.
         '''
         return cls(
+            request.transport_annotation,
             RPCMessageTypes.CANCEL,
             request.method, request.order_key, request.seq_id,
             NullMetadata(), None,
@@ -174,10 +178,10 @@ class RPCMessage(AbstractMessage):
     @classmethod
     def decode(cls, raw_msg: RawHeaderBody,
                deserializer: AbstractDeserializer) -> RPCMessage:
-        header = munpackb(raw_msg[0])
+        header = munpackb(raw_msg.header)
         msgtype = RPCMessageTypes(header['type'])
         compressed = header['zip']
-        raw_data = raw_msg[1]
+        raw_data = raw_msg.body
         if compressed:
             if not has_snappy:
                 raise ConfigurationError('python-snappy is not installed')
@@ -188,12 +192,15 @@ class RPCMessage(AbstractMessage):
             body = deserializer(data['body'])
         else:
             body = data['body']
-        return cls(msgtype,
-                   header['meth'],
-                   header['okey'],
-                   header['seq'],
-                   metadata,
-                   body)
+        return cls(
+            raw_msg.transport_annotation,
+            msgtype,
+            header['meth'],
+            header['okey'],
+            header['seq'],
+            metadata,
+            body,
+        )
 
     def encode(self, serializer: AbstractSerializer, compress: bool = False) \
               -> RawHeaderBody:
@@ -222,4 +229,8 @@ class RPCMessage(AbstractMessage):
             if not has_snappy:
                 raise ConfigurationError('python-snappy is not installed')
             serialized_data = snappy.compress(serialized_data)
-        return (serialized_header, serialized_data)
+        return RawHeaderBody(
+            serialized_header,
+            serialized_data,
+            self.transport_annotation,
+        )

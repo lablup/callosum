@@ -6,7 +6,6 @@ from typing import AsyncGenerator, Optional, Tuple, Union
 
 import attr
 import zmq, zmq.asyncio
-import yarl
 
 from ..abc import RawHeaderBody
 from ..auth import Identity
@@ -16,6 +15,7 @@ from . import (
     AbstractConnection,
     BaseTransport,
 )
+from ..serialize import mpackb, munpackb
 
 ZAP_VERSION = b'1.0'
 
@@ -124,22 +124,38 @@ class ZAPServer:
 
 class ZeroMQConnection(AbstractConnection):
 
-    __slots__ = ('transport', )
+    __slots__ = ('transport', 'peer_id')
 
     transport: ZeroMQTransport
 
-    def __init__(self, transport):
+    def __init__(self, transport, peer_id: bytes = None):
         self.transport = transport
+        self.peer_id = peer_id
 
-    async def recv_message(self) -> AsyncGenerator[
-            Optional[RawHeaderBody], None]:
+    async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         assert not self.transport._closed
-        raw_msg = await self.transport._pull_sock.recv_multipart()
-        yield raw_msg
+        *pre, raw_header, raw_body = await self.transport._sock.recv_multipart()
+        if len(pre) > 0:
+            # server
+            peer_id = pre[0]
+            yield RawHeaderBody(raw_header, raw_body, peer_id)
+        else:
+            # client
+            yield RawHeaderBody(raw_header, raw_body, None)
 
-    async def send_message(self, raw_msg: RawHeaderBody):
+    async def send_message(self, raw_msg: RawHeaderBody) -> None:
         assert not self.transport._closed
-        await self.transport._push_sock.send_multipart(raw_msg)
+        peer_id = raw_msg.transport_annotation
+        if peer_id is not None:
+            # server
+            await self.transport._sock.send_multipart([
+                peer_id, raw_msg.header, raw_msg.body,
+            ])
+        else:
+            # client
+            await self.transport._sock.send_multipart([
+                raw_msg.header, raw_msg.body,
+            ])
 
 
 class ZeroMQBinder(AbstractBinder):
@@ -152,24 +168,16 @@ class ZeroMQBinder(AbstractBinder):
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQConnection(self.transport)
-        pull_sock = self.transport._zctx.socket(zmq.PULL)
-        push_sock = self.transport._zctx.socket(zmq.PUSH)
+        server_sock = self.transport._zctx.socket(zmq.ROUTER)
         if self.transport.authenticator:
             server_id = await self.transport.authenticator.server_identity()
-            pull_sock.zap_domain = server_id.domain.encode('utf8')
-            pull_sock.setsockopt(zmq.CURVE_SERVER, 1)
-            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
-            push_sock.zap_domain = server_id.domain.encode('utf8')
-            push_sock.setsockopt(zmq.CURVE_SERVER, 1)
-            push_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
+            server_sock.zap_domain = server_id.domain.encode('utf8')
+            server_sock.setsockopt(zmq.CURVE_SERVER, 1)
+            server_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
         for key, value in self.transport._zsock_opts.items():
-            pull_sock.setsockopt(key, value)
-            push_sock.setsockopt(key, value)
-        pull_sock.bind(self.addr.uri)
-        url = yarl.URL(self.addr.uri)
-        push_sock.bind(str(url.with_port(url.port + 1)))
-        self.transport._pull_sock = pull_sock
-        self.transport._push_sock = push_sock
+            server_sock.setsockopt(key, value)
+        server_sock.bind(self.addr.uri)
+        self.transport._sock = server_sock
         return ZeroMQConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
@@ -186,30 +194,22 @@ class ZeroMQConnector(AbstractConnector):
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQConnection(self.transport)
-        pull_sock = self.transport._zctx.socket(zmq.PULL)
-        push_sock = self.transport._zctx.socket(zmq.PUSH)
+        client_sock = self.transport._zctx.socket(zmq.DEALER)
         if self.transport.authenticator:
             auth = self.transport.authenticator
             client_id = await auth.client_identity()
             client_public_key = await auth.client_public_key()
             server_public_key = await auth.server_public_key()
-            pull_sock.zap_domain = client_id.domain.encode('utf8')
-            pull_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
-            pull_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-            pull_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
-            push_sock.zap_domain = client_id.domain.encode('utf8')
-            push_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
-            push_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-            push_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
+            client_sock.zap_domain = client_id.domain.encode('utf8')
+            client_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
+            client_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
+            client_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
         for key, value in self.transport._zsock_opts.items():
-            pull_sock.setsockopt(key, value)
-            push_sock.setsockopt(key, value)
-        push_sock.connect(self.addr.uri)
-        url = yarl.URL(self.addr.uri)
-        pull_sock.connect(str(url.with_port(url.port + 1)))
-        self.transport._pull_sock = pull_sock
-        self.transport._push_sock = push_sock
-        return ZeroMQConnection(self.transport)
+            client_sock.setsockopt(key, value)
+        client_sock.connect(self.addr.uri)
+        peer_id = client_sock.get(zmq.IDENTITY)
+        self.transport._sock = client_sock
+        return ZeroMQConnection(self.transport, peer_id)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
         pass
@@ -228,7 +228,7 @@ class ZeroMQTransport(BaseTransport):
     __slots__ = BaseTransport.__slots__ + (
         '_zctx', '_zsock_opts',
         '_zap_server', '_zap_task',
-        '_pull_sock', '_push_sock',
+        '_sock',
     )
 
     binder_cls = ZeroMQBinder
@@ -249,18 +249,17 @@ class ZeroMQTransport(BaseTransport):
             self._zap_task = loop.create_task(self.authenticator.serve())
         self._zctx = zmq.asyncio.Context()
         # Keep sockets during the transport lifetime.
-        self._pull_sock = None
-        self._push_sock = None
+        self._sock = None
 
     @property
     def _closed(self):
-        return self._pull_sock is None or self._pull_sock._closed
+        if self._sock is not None:
+            return self._sock.closed
+        return True
 
     async def close(self):
-        if self._pull_sock is not None:
-            self._pull_sock.close()
-        if self._push_sock is not None:
-            self._push_sock.close()
+        if self._sock is not None:
+            self._sock.close()
         if self._zap_task is not None:
             self._zap_task.cancel()
             await self._zap_task

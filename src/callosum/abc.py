@@ -3,12 +3,17 @@ from __future__ import annotations
 import abc
 from typing import (
     Any, Final, Optional,
-    Tuple,
     Protocol,
+    NamedTuple,
 )
 
+import attr
 
-RawHeaderBody = Tuple[bytes, bytes]
+
+class RawHeaderBody(NamedTuple):
+    header: bytes
+    body: bytes
+    transport_annotation: Optional[bytes]
 
 
 class Sentinel(object):
@@ -33,13 +38,13 @@ CANCELLED: Final = Sentinel()
 
 class AbstractSerializer(Protocol):
 
-    def __call__(self, obj: Optional[Any]) -> bytes:
+    def __call__(self, obj: Optional[Any], /) -> bytes:
         ...
 
 
 class AbstractDeserializer(Protocol):
 
-    def __call__(self, data: bytes) -> Optional[Any]:
+    def __call__(self, data: bytes, /) -> Optional[Any]:
         ...
 
 
@@ -48,7 +53,10 @@ class AbstractDeserializer(Protocol):
 # AbstractDeserializer = Callable[[bytes], Optional[Any]]
 
 
+@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class AbstractMessage(metaclass=abc.ABCMeta):
+
+    transport_annotation: Optional[bytes]
 
     @classmethod
     @abc.abstractmethod
