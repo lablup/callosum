@@ -6,6 +6,7 @@ import logging
 from typing import (
     Any, Optional, Type, Union,
     Mapping, MutableMapping,
+    TYPE_CHECKING,
 )
 import secrets
 
@@ -31,12 +32,11 @@ from ..lower import (
     AbstractBinder, AbstractConnector,
     BaseTransport,
 )
-from .abc import (
-    FunctionHandler, StreamHandler,
-)
 from .message import (
     RPCMessage, RPCMessageTypes,
 )
+if TYPE_CHECKING:
+    from . import FunctionHandler
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +71,6 @@ class Peer(AbstractChannel):
     _deserializer: AbstractDeserializer
     _serializer: AbstractSerializer
     _func_registry: MutableMapping[str, FunctionHandler]
-    _stream_registry: MutableMapping[str, StreamHandler]
     _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
@@ -111,7 +110,6 @@ class Peer(AbstractChannel):
         self._transport = transport(authenticator=authenticator,
                                     transport_opts=transport_opts)
         self._func_registry = {}
-        self._stream_registry = {}
 
         self._seq_id = 0
 
@@ -131,20 +129,11 @@ class Peer(AbstractChannel):
     def handle_function(self, method: str, handler: FunctionHandler) -> None:
         self._func_registry[method] = handler
 
-    def handle_stream(self, method: str, handler: StreamHandler) -> None:
-        self._stream_registry[method] = handler
-
     def unhandle_function(self, method: str) -> None:
         del self._func_registry[method]
 
-    def unhandle_stream(self, method: str) -> None:
-        del self._stream_registry[method]
-
     def _lookup_func(self, method: str) -> FunctionHandler:
         return self._func_registry[method]
-
-    def _lookup_stream(self, method: str) -> StreamHandler:
-        return self._stream_registry[method]
 
     async def _recv_loop(self) -> None:
         '''
@@ -171,12 +160,6 @@ class Peer(AbstractChannel):
                             # TODO: change "await" to "create_task"
                             # and take care of that task cancellation.
                             await self._func_scheduler.cancel(msg.request_id)
-                        elif msg.msgtype == RPCMessageTypes.STREAM:
-                            # TODO: implement
-                            pass
-                            # stream_handler = self._lookup_stream(msg.method)
-                            # asyncio.create_task(
-                            #     self._stream_task(msg, stream_handler))
                         elif msg.msgtype in (RPCMessageTypes.RESULT,
                                              RPCMessageTypes.FAILURE,
                                              RPCMessageTypes.ERROR):
@@ -332,16 +315,3 @@ class Peer(AbstractChannel):
             raise
         except Exception:
             raise
-
-    async def send_stream(self, order_key, metadata, stream, *,
-                          reporthook=None):
-        raise NotImplementedError
-
-    async def tunnel(self, remote_addr, *, inet_proto='tcp') -> Tunnel:
-        '''
-        Open a network tunnel via the peer connection.
-
-        It returns a Tunnel object which contains the local port number where you can
-        send packets to be delivered to the given ``remote_addr``.
-        '''
-        raise NotImplementedError

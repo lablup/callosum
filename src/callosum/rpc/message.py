@@ -61,12 +61,6 @@ class ResultMetadata(Metadata):
 
 
 @attr.dataclass(frozen=True, slots=True)
-class StreamMetadata(Metadata):
-    resource_name: str
-    length: int
-
-
-@attr.dataclass(frozen=True, slots=True)
 class ErrorMetadata(Metadata):
     name: str
     traceback: str
@@ -78,18 +72,18 @@ class NullMetadata(Metadata):
 
 
 class RPCMessageTypes(enum.IntEnum):
-    FUNCTION = 0
-    STREAM = 1
-    RESULT = 2   # result of functions
-    FAILURE = 3  # error from user handlers
-    ERROR = 4    # error from callosum or underlying libraries
-    CANCEL = 5   # client-side timeout or cancel request
+    NULL = 0
+    FUNCTION = 1  # request for a function
+    RESULT = 2    # result of functions
+    FAILURE = 3   # error from user handlers
+    ERROR = 4     # error from callosum or underlying libraries
+    CANCEL = 5    # client-side timeout or cancel request
 
 
 # mapped from RPCMessageTypes as index
 metadata_types = (
+    NullMetadata,
     FunctionMetadata,
-    StreamMetadata,
     ResultMetadata,
     ErrorMetadata,
     ErrorMetadata,  # intended duplication
@@ -99,9 +93,13 @@ metadata_types = (
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class RPCMessage(AbstractMessage):
+
+    # transport-layer annotations
+    peer_id: Optional[Any]
+
     # header parts
     msgtype: RPCMessageTypes
-    method: str        # function/stream ID
+    method: str        # function ID
     order_key: str  # replied back as-is
     seq_id: int      # replied back as-is
 

@@ -7,8 +7,6 @@ from typing import (
     NamedTuple,
 )
 
-import attr
-
 
 class RawHeaderBody(NamedTuple):
     header: bytes
@@ -48,10 +46,7 @@ class AbstractDeserializer(Protocol):
         ...
 
 
-@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class AbstractMessage(metaclass=abc.ABCMeta):
-
-    peer_id: Optional[Any]
 
     @classmethod
     @abc.abstractmethod

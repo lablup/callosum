@@ -43,7 +43,6 @@ async def handle_add(request):
 async def handle_output(request):
     global show_output
     show_output = request.body['enabled']
-    return {}
 
 
 async def handle_show_memory_stat(request):
@@ -67,7 +66,6 @@ async def handle_show_memory_stat(request):
     if hasattr(scheduler, '_pending'):
         print('_pending', len(scheduler._pending))
         print(scheduler._pending)
-    return {}
 
 
 async def handle_long_delay(request):
