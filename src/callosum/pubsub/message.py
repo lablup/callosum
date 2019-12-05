@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import datetime
+from datetime import datetime
 from typing import (
     Any,
 )
 
 import attr
+from dateutil.tz import tzutc
+import temporenc
+
 from ..abc import (
     AbstractSerializer, AbstractDeserializer,
     AbstractMessage, RawHeaderBody,
@@ -16,35 +19,27 @@ from ..serialize import mpackb, munpackb
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
 class PubSubMessage(AbstractMessage):
     # header parts
-    timestamp: datetime.datetime
+    created_at: datetime
 
     # body parts
     body: Any
 
-    @property
-    def header(self) -> datetime.datetime:
-        return self.timestamp
-
     @classmethod
-    def create(cls, timestamp: datetime.datetime, body: Any):
-        return cls(None, timestamp, body)
+    def create(cls, body: Any):
+        created_at = datetime.now(tzutc())
+        return cls(created_at, body)
 
     @classmethod
     def decode(cls, raw_msg: RawHeaderBody,
                deserializer: AbstractDeserializer) -> PubSubMessage:
         header = munpackb(raw_msg[0])
-        # format string assumes that datetime object includes timezone!
-        fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
-        timestamp = datetime.datetime.strptime(header['timestamp'], fmt)
-        return cls(None, timestamp, deserializer(raw_msg[1]))
+        created_at = temporenc.unpackb(header[0]).datetime()
+        return cls(created_at, deserializer(raw_msg[1]))
 
     def encode(self, serializer: AbstractSerializer) -> RawHeaderBody:
-        # format string assumes that datetime object includes timezone!
-        fmt = "%y/%m/%d, %H:%M:%S:%f, %z%Z"
-        timestamp: str = self.timestamp.strftime(fmt)
-        header = {
-            'timestamp': timestamp,
-        }
+        header = [
+            temporenc.packb(self.created_at),
+        ]
         serialized_header: bytes = mpackb(header)
         serialized_body: bytes = serializer(self.body)
         return RawHeaderBody(serialized_header, serialized_body, None)

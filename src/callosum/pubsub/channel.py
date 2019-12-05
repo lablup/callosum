@@ -136,7 +136,7 @@ class Consumer(AbstractChannel):
         if transport is None:
             raise ValueError('You must provide a transport class.')
         self._transport = transport(authenticator=authenticator,
-                                        transport_opts=transport_opts)
+                                    transport_opts=transport_opts)
         self._scheduler = scheduler
         self._max_concurrency = max_concurrency
 
