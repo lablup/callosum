@@ -119,6 +119,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             await s.ev.wait()
 
         job = await scheduler.spawn(coro)
+        job._explicit = True
         self._jobs[request_id] = job
 
         def cb(s, rqst_id, task):

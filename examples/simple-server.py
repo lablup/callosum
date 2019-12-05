@@ -120,15 +120,18 @@ async def serve(scheduler_type: str) -> None:
     loop.add_signal_handler(signal.SIGINT, forever.cancel)
     loop.add_signal_handler(signal.SIGTERM, forever.cancel)
 
-    tracemalloc.start(10)
-    async with peer:
-        last_snapshot = tracemalloc.take_snapshot()
-        try:
-            print('server started')
-            await forever
-        except asyncio.CancelledError:
-            pass
-    print('server terminated')
+    try:
+        tracemalloc.start(10)
+        async with peer:
+            last_snapshot = tracemalloc.take_snapshot()
+            try:
+                print('server started')
+                await forever
+            except asyncio.CancelledError:
+                pass
+        print('server terminated')
+    finally:
+        tracemalloc.stop()
 
 
 @click.command()

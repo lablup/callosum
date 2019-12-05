@@ -7,7 +7,7 @@ do_test() {
   echo "$(tput bold)Testing pairs: $(tput setaf 3)$1$(tput setaf 4) <==> $(tput setaf 3)$2$(tput sgr0)"
   trap "pkill -TERM -P $$" ERR RETURN
   python "$1" &
-  timeout 30 python "$2"
+  timeout 60 python "$2"
 }
 
 do_test simple-server.py simple-client.py
