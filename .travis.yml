@@ -23,7 +23,7 @@ matrix:
 
 install:
   - pip install -U setuptools pip
-  - pip install -U -e ".[build,dev,test,zeromq,redis]"
+  - pip install -U -e ".[build,dev,test,zeromq,redis,thrift]"
 script:
   - python -m mypy src examples
   - python -m flake8 src tests examples
