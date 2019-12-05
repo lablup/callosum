@@ -99,7 +99,9 @@ class ThriftClientAdaptor(BaseRPCClientAdaptor):
             # with its own lower transport layer.
             raw_request_body = writer_trans.getvalue()
             raw_response_body = yield raw_request_body
-            assert raw_response_body is not None
+            if raw_response_body is None:
+                yield None
+                return
             reader_trans.write(raw_response_body)
             reader_trans.seek(0, io.SEEK_SET)
 
