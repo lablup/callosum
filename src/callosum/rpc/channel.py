@@ -41,22 +41,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _identity(val):
-    return val
-
-
-@attr.dataclass(frozen=True, slots=True)
-class Tunnel:
-    peer: 'Peer'
-    tunnel_id: str
-    remote_addr: str
-    local_port: int
-
-    async def close(self):
-        # TODO: implement
-        pass
-
-
 class Peer(AbstractChannel):
     '''
     Represents a bidirectional connection where both sides can invoke each
