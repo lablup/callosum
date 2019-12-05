@@ -11,8 +11,6 @@ from typing import (
 
 import aiojobs
 from aiotools import aclosing
-from datetime import datetime
-from dateutil.tz import tzutc
 
 from ..abc import (
     Sentinel, CLOSED,
@@ -27,7 +25,7 @@ from ..lower import (
     AbstractConnection,
     BaseTransport,
 )
-from .message import PubSubMessage
+from .message import StreamMessage
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +37,7 @@ class Publisher(AbstractChannel):
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractBinder]
-    _outgoing_queue: asyncio.Queue[Union[Sentinel, PubSubMessage]]
+    _outgoing_queue: asyncio.Queue[Union[Sentinel, StreamMessage]]
     _send_task: Optional[asyncio.Task]
     _serializer: AbstractSerializer
 
@@ -98,10 +96,8 @@ class Publisher(AbstractChannel):
         if self._transport is not None:
             await self._transport.close()
 
-    def push(self,
-             body,
-             timestamp: datetime = datetime.now(tzutc())) -> None:
-        msg = PubSubMessage.create(timestamp, body)
+    def push(self, body) -> None:
+        msg = StreamMessage.create(body)
         self._outgoing_queue.put_nowait(msg)
 
 
@@ -115,7 +111,7 @@ class Consumer(AbstractChannel):
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractConnector]
-    _incoming_queue: asyncio.Queue[PubSubMessage]
+    _incoming_queue: asyncio.Queue[StreamMessage]
     _recv_task: Optional[asyncio.Task]
     _deserializer: AbstractDeserializer
 
@@ -164,7 +160,7 @@ class Consumer(AbstractChannel):
                     async for raw_msg in agen:
                         if raw_msg is None:
                             return
-                        msg = PubSubMessage.decode(raw_msg, self._deserializer)
+                        msg = StreamMessage.decode(raw_msg, self._deserializer)
                         for handler in self._handler_registry:
                             if (asyncio.iscoroutine(handler) or
                                     asyncio.iscoroutinefunction(handler)):

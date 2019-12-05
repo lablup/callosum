@@ -17,7 +17,7 @@ from ..serialize import mpackb, munpackb
 
 
 @attr.dataclass(frozen=True, slots=True, auto_attribs=True)
-class PubSubMessage(AbstractMessage):
+class StreamMessage(AbstractMessage):
     # header parts
     created_at: datetime
 
@@ -31,7 +31,7 @@ class PubSubMessage(AbstractMessage):
 
     @classmethod
     def decode(cls, raw_msg: RawHeaderBody,
-               deserializer: AbstractDeserializer) -> PubSubMessage:
+               deserializer: AbstractDeserializer) -> StreamMessage:
         header = munpackb(raw_msg[0])
         created_at = temporenc.unpackb(header[0]).datetime()
         return cls(created_at, deserializer(raw_msg[1]))

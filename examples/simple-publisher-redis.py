@@ -7,8 +7,6 @@ import asyncio
 import json
 import random
 import secrets
-from datetime import datetime
-from dateutil.tz import tzutc
 
 from callosum.pubsub import (
     Publisher,
@@ -35,8 +33,7 @@ async def publish() -> None:
                 'type': "instance_heartbeat",
                 'agent_id': agent_id,
             }
-            pub.push(msg_body,
-                     datetime.now(tzutc()))
+            pub.push(msg_body)
             print("pushed heartbeat")
 
     async def addition_event(addend1: int, addend2: int):
@@ -45,8 +42,7 @@ async def publish() -> None:
             'type': "number_addition",
             'addends': (addend1, addend2),
         }
-        pub.push(msg_body,
-                 datetime.now(tzutc()))
+        pub.push(msg_body)
         print("pushed addition event")
 
     async with pub:

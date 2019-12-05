@@ -1,8 +1,8 @@
-from .message import PubSubMessage
+from .message import StreamMessage
 from .channel import Publisher, Consumer
 
 __all__ = (
-    'PubSubMessage',
+    'StreamMessage',
     'Publisher',
     'Consumer',
 )
