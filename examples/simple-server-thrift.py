@@ -15,14 +15,18 @@ simple_thrift = thriftpy.load(
 
 
 class SimpleDispatcher:
-    async def echo(self, msg):
+    async def echo(self, msg: str) -> str:
         return msg
 
-    async def add(self, a, b):
+    async def add(self, a: int, b: int) -> int:
         return a + b
 
-    async def oops(self):
+    async def oops(self) -> bool:
         raise ZeroDivisionError('oops')
+
+    async def long_delay(self) -> bool:
+        await asyncio.sleep(5.0)
+        return True
 
 
 async def serve() -> None:

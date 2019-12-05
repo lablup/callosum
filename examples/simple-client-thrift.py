@@ -2,7 +2,10 @@ import asyncio
 import pathlib
 import random
 import secrets
+import sys
 import textwrap
+
+from async_timeout import timeout
 
 from callosum.rpc import Peer, RPCUserError
 from callosum.serialize import noop_serializer, noop_deserializer
@@ -49,6 +52,25 @@ async def call() -> None:
         except RPCUserError as e:
             print('catched remote error as expected:')
             print(textwrap.indent(e.traceback, prefix='| '))
+
+        try:
+            with timeout(0.5):
+                await peer.invoke('simple', adaptor.long_delay())
+        except asyncio.TimeoutError:
+            print('long_delay(): timeout occurred as expected '
+                  '(with per-call timeout)')
+        else:
+            print('long_delay(): timeout did not occur!')
+            sys.exit(1)
+
+        try:
+            await peer.invoke('simple', adaptor.long_delay())
+        except asyncio.TimeoutError:
+            print('long_delay(): timeout occurred as expected '
+                  '(with default timeout)')
+        else:
+            print('long_delay(): timeout did not occur!')
+            sys.exit(1)
 
 
 if __name__ == '__main__':
