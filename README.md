@@ -31,6 +31,7 @@ Installation
 To install the core:
 
 ```console
+$ pip install -U pip setuptools
 $ pip install callosum
 ```
 
@@ -44,3 +45,13 @@ Examples
 --------
 
 Please check out [the examples directory.](https://github.com/lablup/callosum/tree/master/examples)
+
+Development
+-----------
+
+Use the editable installation of Python setuptools.
+
+```console
+$ pip install -U pip setuptools
+$ pip install -U -e '.[dev,build,test,zeromq,redis,thrift]'
+```
