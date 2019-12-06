@@ -10,6 +10,11 @@ streaming transport for *upper* RPC layers (e.g., Apache Thrift) by wrapping
 *Corpus callosum* is a bundle of neuron fibers that connects two cerebral
 hemispheres of a human brain.
 
+Prerequisite
+------------
+
+Python 3.8 or higher.
+
 Features
 --------
 
@@ -23,4 +28,19 @@ Features
 Installation
 ------------
 
-TODO
+To install the core:
+
+```console
+$ pip install callosum
+```
+
+You may add extra dependencies like:
+
+```console
+$ pip install 'callosum[zeromq,redis,thrift]'
+```
+
+Examples
+--------
+
+Please check out [the examples directory.](https://github.com/lablup/callosum/tree/master/examples)
