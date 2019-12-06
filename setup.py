@@ -20,7 +20,6 @@ install_requires = [
     'python-dateutil>=2.8.1',
     'msgpack~=0.6.2',
     'temporenc~=0.1',
-    'yarl>=1.3.0',
 ]
 
 build_requires = [
