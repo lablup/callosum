@@ -32,6 +32,14 @@ Features
 * Optional message compression using [snappy](https://pypi.org/project/python-snappy/)
 * Replacible and combinable lower/upper layers (ZeroMQ/Redis + JSON/msgpack/Thrift)
 
+Planned features
+----------------
+
+* Managed streaming (with acks)
+* Tunneling to bundle other channels and generic network traffic in a single connection
+* Bidirectional RPC
+* Chunked transfer of large messages
+
 Installation
 ------------
 
