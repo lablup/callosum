@@ -7,6 +7,8 @@ It provides an asynchronous multi-channel order-preserving message and data
 streaming transport for *upper* RPC layers (e.g., Apache Thrift) by wrapping
 *lower* transport implementations (e.g., ZeroMQ).
 
+It aims to follow the latest coding style and conventions in Python asyncio.
+
 *Corpus callosum* is a bundle of neuron fibers that connects two cerebral
 hemispheres of a human brain.
 
@@ -18,12 +20,15 @@ Python 3.8 or higher.
 Features
 --------
 
-* Designed for Python asyncio and bases on ZeroMQ
+* RPC
+  - Native timeout and cancellation support
+  - Explicit server-to-client error propagation including stringified tracebacks
+  - Order preserving based on user-defined keys while keeping executions asynchronous
+  - Concurrency limits based on [aiojobs](https://github.com/aio-libs/aiojobs)
+* Streaming
+  - Broadcast & shared pipelines
 * Client authentication and encrypted communication
-* Persistent multiple messaging channels where each channel is order-preserved
-* Intrinsic support for error propagation
-* Supports large-size data streaming via automatic chunking
-* Replacible lower/upper layers
+* Replacible and combinable lower/upper layers (ZeroMQ/Redis + JSON/msgpack/Thrift)
 
 Installation
 ------------
