@@ -60,7 +60,7 @@ redis_requires = [
     'aioredis>=1.3.0',
 ]
 
-compress_requires = [
+snappy_requires = [
     'python-snappy>=0.5.4',
 ]
 
@@ -109,6 +109,6 @@ setup(
         'thrift': thrift_requires,
         'zeromq': zmq_requires,
         'redis': redis_requires,
-        'compress': compress_requires,
+        'snappy': snappy_requires,
     },
 )

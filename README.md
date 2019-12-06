@@ -27,7 +27,9 @@ Features
   - Concurrency limits based on [aiojobs](https://github.com/aio-libs/aiojobs)
 * Streaming
   - Broadcast & shared pipelines
-* Client authentication and encrypted communication
+* Optional client authentication and encrypted communication
+  - Currently supported for only ZeroMQ with its CURVE library
+* Optional message compression using [snappy](https://pypi.org/project/python-snappy/)
 * Replacible and combinable lower/upper layers (ZeroMQ/Redis + JSON/msgpack/Thrift)
 
 Installation
@@ -43,7 +45,7 @@ $ pip install callosum
 You may add extra dependencies like:
 
 ```console
-$ pip install 'callosum[zeromq,redis,thrift]'
+$ pip install 'callosum[zeromq,redis,thrift,snappy]'
 ```
 
 Examples
@@ -58,5 +60,5 @@ Use the editable installation of Python setuptools.
 
 ```console
 $ pip install -U pip setuptools
-$ pip install -U -e '.[dev,build,test,zeromq,redis,thrift]'
+$ pip install -U -e '.[dev,build,test,zeromq,redis,thrift,snappy]'
 ```
