@@ -41,12 +41,14 @@ class Publisher(AbstractChannel):
     _send_task: Optional[asyncio.Task]
     _serializer: AbstractSerializer
 
-    def __init__(self, *,
-                 serializer: AbstractSerializer,
-                 bind: AbstractAddress = None,
-                 transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None,
-                 transport_opts: Mapping[str, Any] = {}):
+    def __init__(
+        self, *,
+        serializer: AbstractSerializer,
+        bind: AbstractAddress = None,
+        transport: Type[BaseTransport] = None,
+        authenticator: AbstractAuthenticator = None,
+        transport_opts: Mapping[str, Any] = {},
+    ) -> None:
         if bind is None:
             raise ValueError('You must specify the bind address.')
         self._bind = bind
@@ -115,14 +117,16 @@ class Consumer(AbstractChannel):
     _recv_task: Optional[asyncio.Task]
     _deserializer: AbstractDeserializer
 
-    def __init__(self, *,
-                 deserializer: AbstractDeserializer,
-                 connect: AbstractAddress = None,
-                 transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None,
-                 transport_opts: Mapping[str, Any] = {},
-                 scheduler=None,
-                 max_concurrency: int = 100):
+    def __init__(
+        self, *,
+        deserializer: AbstractDeserializer,
+        connect: AbstractAddress = None,
+        transport: Type[BaseTransport] = None,
+        authenticator: AbstractAuthenticator = None,
+        transport_opts: Mapping[str, Any] = {},
+        scheduler=None,
+        max_concurrency: int = 100,
+    ) -> None:
         if connect is None:
             raise ValueError('You must specify the connect address.')
         self._connect = connect

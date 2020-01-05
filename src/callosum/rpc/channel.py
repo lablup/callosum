@@ -59,22 +59,26 @@ class Peer(AbstractChannel):
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
     _opener: Optional[Union[AbstractBinder, AbstractConnector]]
+    _log: logging.Logger
+    _debug_rpc: bool
 
-    def __init__(self, *,
-                 deserializer: AbstractDeserializer,
-                 serializer: AbstractSerializer,
-                 connect: AbstractAddress = None,
-                 bind: AbstractAddress = None,
-                 transport: Type[BaseTransport] = None,
-                 authenticator: AbstractAuthenticator = None,
-                 transport_opts: Mapping[str, Any] = {},
-                 scheduler: AbstractAsyncScheduler = None,
-                 compress: bool = True,
-                 max_body_size: int = 10 * (2**20),  # 10 MiBytes
-                 max_concurrency: int = 100,
-                 execute_timeout: float = None,
-                 invoke_timeout: float = None) -> None:
-
+    def __init__(
+        self, *,
+        deserializer: AbstractDeserializer,
+        serializer: AbstractSerializer,
+        connect: AbstractAddress = None,
+        bind: AbstractAddress = None,
+        transport: Type[BaseTransport] = None,
+        authenticator: AbstractAuthenticator = None,
+        transport_opts: Mapping[str, Any] = {},
+        scheduler: AbstractAsyncScheduler = None,
+        compress: bool = True,
+        max_body_size: int = 10 * (2**20),  # 10 MiBytes
+        max_concurrency: int = 100,
+        execute_timeout: float = None,
+        invoke_timeout: float = None,
+        debug_rpc: bool = False,
+    ) -> None:
         if connect is None and bind is None:
             raise ValueError('You must specify either the connect or bind address.')
         self._connect = connect
@@ -109,6 +113,7 @@ class Peer(AbstractChannel):
         self._send_task = None
 
         self._log = logging.getLogger(__name__ + '.Peer')
+        self._debug_rpc = debug_rpc
 
     def handle_function(self, method: str, handler: FunctionHandler) -> None:
         self._func_registry[method] = handler
@@ -223,6 +228,8 @@ class Peer(AbstractChannel):
                 raise
             except Exception:
                 # exception from user handler => failure
+                if self._debug_rpc:
+                    self._log.exception('RPC user error')
                 response = RPCMessage.failure(request)
             else:
                 assert not isinstance(result, Sentinel)
@@ -232,6 +239,8 @@ class Peer(AbstractChannel):
         except asyncio.CancelledError:
             raise
         except Exception:
+            if self._debug_rpc:
+                self._log.exception('RPC internal error')
             # exception from our parts => error
             response = RPCMessage.error(request)
         await self._outgoing_queue.put(response)
