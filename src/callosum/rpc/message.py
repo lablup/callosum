@@ -105,7 +105,7 @@ class RPCMessage(AbstractMessage):
 
     # body parts (compressable)
     metadata: Optional[Metadata]
-    body: Optional[bytes]
+    body: Optional[Any]
 
     @property
     def request_id(self):
