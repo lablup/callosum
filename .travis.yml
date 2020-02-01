@@ -18,15 +18,10 @@ python:
 os:
   - linux
 
-matrix:
-  fast_finish: true
-
 install:
   - pip install -U setuptools pip
-  - pip install -U -e ".[build,dev,test,zeromq,redis,thrift,snappy]"
+  - pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
 script:
-  - python -m mypy src examples
-  - python -m flake8 src tests examples
   - python -m pytest tests
   - ./scripts/run-integration-tests.sh
 after_success:
@@ -34,6 +29,7 @@ after_success:
 
 # stage def.
 jobs:
+  fast_finish: true
   include:
 
     - stage: test
@@ -51,10 +47,6 @@ jobs:
         user: __token__
         password:
           secure: "Dxzu1pysTSrQKN08QIYrufp4XGYHXEgvGNLZqQKs3OUvijdfiedVkGYEVH25L0vvdSLekTMcE3Pc7QZ/E7lEOw5Fzh7SrHIaPcB8jE+kKd6RDSeFEdu38o2hD5T73/YbvENr3uOik1GhCkvSdF3qhT+bTHj3PKbqR4bMLSVF4Fm/aOTswdSJpTAdjg6718E44ih+s05/gfh9y3AsDuyVSzYYHM5GLq7Pbxo9a9/yz9OEg+evhi+J4osnRIBQYYErOajD8bVFrvy8kYZCOJX79tQPZiMeKgMSakFX/KYJRxsPoMQ1d+0uyNAjAvN1Rm+obzFf3QVn6h1+f7VeySuezPT+X9yZarAi/iyEAnsXap/o8ljK9/yl4DEtSTnmUDCHqAboKIPUvoLKeeDCDgCXUJkxR4RNAoRMe5JbtfX2XAAnq1oKV9Wk6/04cVSjhd3mb+E8pdwXtxVqKbmK99Kd211UeaQCNqpSxYy6zLhs7aumZA/PgReXKn3NKgDLkaYC2Z21anes7bz727nFG5lEHs4t3GxqlJl7l+C56w9JmOdAkZe/8NnzaYoTI018XVwyHQ+pxd5Q0MZLrND68cJmsacoccUlE2VFp/vPKmUi218Y5Canj/BaoW5wjvSTiq7qYHSJoDUaeUb/bsnpbGuLoc/UB9/rbVYr3W4UO9qhxTg="
-
-  exclude:
-    # exclude the redundant default job
-    - python: "3.8"
 
 
 notifications:
