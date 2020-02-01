@@ -33,13 +33,19 @@ test_requires = [
     'pytest-asyncio>=0.10',
     'pytest-cov',
     'pytest-mock',
-    'mypy>=0.750',
-    'flake8>=3.7.9',
     'codecov',
 ]
 
 dev_requires = [
     'pytest-sugar',
+]
+
+lint_requires = [
+    'flake8>=3.7.9',
+]
+
+typecheck_requires = [
+    'mypy>=0.760',
 ]
 
 docs_requires = [
@@ -75,7 +81,7 @@ setup(
     author_email='joongi@lablup.com',
     license="MIT",
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Framework :: AsyncIO',
         'License :: OSI Approved :: MIT License',
         'Intended Audience :: Developers',
@@ -98,12 +104,14 @@ setup(
     },
     include_package_data=True,
     python_requires='>=3.8',
-    setup_requires=['setuptools>=42.0.1'],
+    setup_requires=['setuptools>=45.0.0'],
     install_requires=install_requires,
     extras_require={
         'build': build_requires,
         'test': test_requires,
         'dev': dev_requires,
+        'lint': lint_requires,
+        'typecheck': typecheck_requires,
         'docs': docs_requires,
         'thrift': thrift_requires,
         'zeromq': zmq_requires,
