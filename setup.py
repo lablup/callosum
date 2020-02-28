@@ -15,11 +15,11 @@ def read_src_version():
 install_requires = [
     'aiojobs>=0.2.2',
     'aiotools>=0.8.5',
-    'async_timeout~=3.0.1',
+    'async_timeout>=3.0.1',
     'attrs>=19.3.0',
     'python-dateutil>=2.8.1',
-    'msgpack~=0.6.2',
-    'temporenc~=0.1',
+    'msgpack>=1.0.0',
+    'temporenc>=0.1',
 ]
 
 build_requires = [
@@ -29,7 +29,7 @@ build_requires = [
 
 test_requires = [
     'Click>=7.0',
-    'pytest>=5.2',
+    'pytest>=5.3',
     'pytest-asyncio>=0.10',
     'pytest-cov',
     'pytest-mock',
@@ -58,7 +58,7 @@ thrift_requires = [
 ]
 
 zmq_requires = [
-    'pyzmq>=18.1.1',
+    'pyzmq>=19.0.0',
 ]
 
 redis_requires = [
