@@ -6,7 +6,7 @@ addons:
     packages:
     - libsnappy-dev
 services:
-  - redis-server
+  - redis
 
 stages:
   - name: test
@@ -43,8 +43,8 @@ jobs:
           tags: true
         provider: pypi
         distributions: sdist bdist_wheel
-        skip_upload_docs: true
-        user: __token__
+        upload_docs: false
+        username: __token__
         password:
           secure: "Dxzu1pysTSrQKN08QIYrufp4XGYHXEgvGNLZqQKs3OUvijdfiedVkGYEVH25L0vvdSLekTMcE3Pc7QZ/E7lEOw5Fzh7SrHIaPcB8jE+kKd6RDSeFEdu38o2hD5T73/YbvENr3uOik1GhCkvSdF3qhT+bTHj3PKbqR4bMLSVF4Fm/aOTswdSJpTAdjg6718E44ih+s05/gfh9y3AsDuyVSzYYHM5GLq7Pbxo9a9/yz9OEg+evhi+J4osnRIBQYYErOajD8bVFrvy8kYZCOJX79tQPZiMeKgMSakFX/KYJRxsPoMQ1d+0uyNAjAvN1Rm+obzFf3QVn6h1+f7VeySuezPT+X9yZarAi/iyEAnsXap/o8ljK9/yl4DEtSTnmUDCHqAboKIPUvoLKeeDCDgCXUJkxR4RNAoRMe5JbtfX2XAAnq1oKV9Wk6/04cVSjhd3mb+E8pdwXtxVqKbmK99Kd211UeaQCNqpSxYy6zLhs7aumZA/PgReXKn3NKgDLkaYC2Z21anes7bz727nFG5lEHs4t3GxqlJl7l+C56w9JmOdAkZe/8NnzaYoTI018XVwyHQ+pxd5Q0MZLrND68cJmsacoccUlE2VFp/vPKmUi218Y5Canj/BaoW5wjvSTiq7qYHSJoDUaeUb/bsnpbGuLoc/UB9/rbVYr3W4UO9qhxTg="
 
