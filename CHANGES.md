@@ -1,6 +1,12 @@
 Changes
 =======
 
+v0.9.2 (2020-02-28)
+-------------------
+
+* MAINTENANCE: Update dependencies and only specify the minimum versions since
+  Callosum is a library.
+
 v0.9.1 (2020-01-05)
 -------------------
 

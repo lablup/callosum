@@ -104,7 +104,7 @@ setup(
     },
     include_package_data=True,
     python_requires='>=3.8',
-    setup_requires=['setuptools>=45.0.0'],
+    setup_requires=['setuptools>=45.2.0'],
     install_requires=install_requires,
     extras_require={
         'build': build_requires,
