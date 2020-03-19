@@ -50,7 +50,7 @@ class AsyncResolver:
 
     def cancel(self, request_id):
         if request_id in self._futures:
-            self._futures.pop(request_id)
+            self._futures.pop(request_id, None)
 
     def resolve(self, request_id, result):
         fut = self._futures.pop(request_id, None)
@@ -143,7 +143,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
         return self._futures[request_id]
 
     async def cleanup(self, request_id):
-        self._futures.pop(request_id)
+        self._futures.pop(request_id, None)
         self.remove_if_empty(request_id[1])
         if request_id in self._jobs:
             self._jobs.pop(request_id, None)
@@ -224,7 +224,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
             rid = (s.method, okey, s.seq)
             if rid in self._results:
                 heapq.heappop(self._sequences[okey])
-                result = self._results.pop(rid)
+                result = self._results.pop(rid, None)
                 fut = self._futures.pop(rid, None)
                 _resolve_future(rid, fut, result, self._log)
             else:
