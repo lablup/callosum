@@ -1,6 +1,12 @@
 Changes
 =======
 
+v0.9.3 (2020-03-20)
+-------------------
+
+* FIX: Mitigate bogus KeyError when cleaning up task futures in RPC servers that has caused event
+  loop spinning.
+
 v0.9.2 (2020-02-28)
 -------------------
 
