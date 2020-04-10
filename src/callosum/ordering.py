@@ -125,7 +125,6 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
         def cb(seq_item, rqst_id, task):
             _, okey, _ = rqst_id
-            seq_item.ev.set()
             if task.cancelled():
                 result = CANCELLED
                 # already removed from the pending heap
@@ -137,6 +136,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
                     _resolve_future(rqst_id, fut, task.exception(), self._log)
                 else:
                     _resolve_future(rqst_id, fut, task.result(), self._log)
+            seq_item.ev.set()
 
         job._task.add_done_callback(functools.partial(cb, head, request_id))
 
