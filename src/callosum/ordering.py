@@ -75,7 +75,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def cleanup(self, request_id):
+    def cleanup(self, request_id):
         raise NotImplementedError
 
 
@@ -204,7 +204,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         self._futures[request_id] = fut
         return fut
 
-    async def cleanup(self, request_id):
+    def cleanup(self, request_id):
         self._futures.pop(request_id, None)
 
     async def cancel(self, request_id):
