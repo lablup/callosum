@@ -1,6 +1,15 @@
 Changes
 =======
 
+v0.9.4 (2020-04-10)
+-------------------
+
+#### Fixes
+* Fix a race condition due to overlapping RPC message sequence IDs by separating server/client message sequence IDs [(#12)](https://github.com/lablup/callosum/issues/12)
+
+#### Miscellaneous
+* Adopt towncrier for changelog management [(#11)](https://github.com/lablup/callosum/issues/11)
+
 v0.9.3 (2020-03-20)
 -------------------
 
