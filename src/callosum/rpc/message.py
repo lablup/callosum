@@ -3,7 +3,10 @@ from __future__ import annotations
 import enum
 import sys
 import traceback
-from typing import Any, Final, Optional
+from typing import (
+    Any, Final, Optional,
+    Tuple,
+)
 
 import attr
 try:
@@ -101,15 +104,15 @@ class RPCMessage(AbstractMessage):
     msgtype: RPCMessageTypes
     method: str        # function ID
     order_key: str  # replied back as-is
-    seq_id: int      # replied back as-is
+    client_seq_id: int      # replied back as-is
 
     # body parts (compressable)
     metadata: Optional[Metadata]
     body: Optional[Any]
 
     @property
-    def request_id(self):
-        return (self.method, self.order_key, self.seq_id)
+    def request_id(self) -> Tuple[str, str, int]:
+        return (self.method, self.order_key, self.client_seq_id)
 
     @classmethod
     def result(cls, request, result_body):
@@ -119,7 +122,9 @@ class RPCMessage(AbstractMessage):
         return cls(
             request.peer_id,
             RPCMessageTypes.RESULT,
-            request.method, request.order_key, request.seq_id,
+            request.method,
+            request.order_key,
+            request.client_seq_id,
             ResultMetadata(),
             result_body,
         )
@@ -137,7 +142,7 @@ class RPCMessage(AbstractMessage):
         return cls(
             request.peer_id,
             RPCMessageTypes.FAILURE,
-            request.method, request.order_key, request.seq_id,
+            request.method, request.order_key, request.client_seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
             None,
         )
@@ -155,7 +160,7 @@ class RPCMessage(AbstractMessage):
         return cls(
             request.peer_id,
             RPCMessageTypes.ERROR,
-            request.method, request.order_key, request.seq_id,
+            request.method, request.order_key, request.client_seq_id,
             ErrorMetadata(exc_info[0].__name__, traceback.format_exc()),
             None,
         )
@@ -169,7 +174,7 @@ class RPCMessage(AbstractMessage):
         return cls(
             request.peer_id,
             RPCMessageTypes.CANCEL,
-            request.method, request.order_key, request.seq_id,
+            request.method, request.order_key, request.client_seq_id,
             NullMetadata(), None,
         )
 
@@ -209,7 +214,7 @@ class RPCMessage(AbstractMessage):
             'type': int(self.msgtype),
             'meth': self.method,
             'okey': self.order_key,
-            'seq': self.seq_id,
+            'seq': self.client_seq_id,
             'zip': compress,
         }
         serialized_header: bytes = mpackb(header)
