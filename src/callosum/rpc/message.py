@@ -5,7 +5,6 @@ import sys
 import traceback
 from typing import (
     Any, Final, Optional,
-    Tuple,
 )
 
 import attr
