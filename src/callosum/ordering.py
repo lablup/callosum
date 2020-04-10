@@ -23,7 +23,7 @@ def _resolve_future(request_id, fut, result, log):
     if fut.done():
         if fut.cancelled():
             log.debug('resolved cancelled request: %r', request_id)
-        if fut.exception() is not None:
+        elif fut.exception() is not None:
             log.debug('resolved errored request: %r', request_id)
         return
     if isinstance(result, BaseException):
@@ -75,7 +75,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def cleanup(self, request_id):
+    def cleanup(self, request_id):
         raise NotImplementedError
 
 
@@ -106,43 +106,44 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     async def schedule(self, request_id, scheduler, coro):
         method, okey, seq = request_id
         loop = asyncio.get_running_loop()
-        self._futures[request_id] = loop.create_future()
+        fut = loop.create_future()
+        self._futures[request_id] = fut
         ev = asyncio.Event()
         heapq.heappush(self._pending[okey], _SeqItem(method, seq, ev))
 
         while True:
             assert len(self._pending[okey]) > 0
-            s = self._pending[okey][0]
-            if s.seq == seq:
+            head = self._pending[okey][0]
+            if head.seq == seq:
                 break
             # Wait until the head item finishes.
-            await s.ev.wait()
+            await head.ev.wait()
 
         job = await scheduler.spawn(coro)
         job._explicit = True
         self._jobs[request_id] = job
 
-        def cb(s, rqst_id, task):
+        def cb(seq_item, rqst_id, task):
             _, okey, _ = rqst_id
-            s.ev.set()
-            fut = self.get_fut(rqst_id)
+            seq_item.ev.set()
             if task.cancelled():
                 result = CANCELLED
                 # already removed from the pending heap
                 _resolve_future(rqst_id, fut, result, self._log)
             else:
-                heapq.heappop(self._pending[okey])
+                s = heapq.heappop(self._pending[okey])
+                assert s == seq_item
                 if task.exception() is not None:
                     _resolve_future(rqst_id, fut, task.exception(), self._log)
                 else:
                     _resolve_future(rqst_id, fut, task.result(), self._log)
 
-        job._task.add_done_callback(functools.partial(cb, s, request_id))
+        job._task.add_done_callback(functools.partial(cb, head, request_id))
 
     def get_fut(self, request_id) -> asyncio.Future:
         return self._futures[request_id]
 
-    async def cleanup(self, request_id):
+    def cleanup(self, request_id):
         self._futures.pop(request_id, None)
         self.remove_if_empty(request_id[1])
         if request_id in self._jobs:
@@ -151,13 +152,14 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     async def cancel(self, request_id):
         method, okey, seq = request_id
         if request_id in self._futures:
-            for seq_item in self._pending[okey]:
-                if seq_item.method == method and seq_item.seq == seq:
-                    self._pending[okey].remove(seq_item)
-            if self._pending[okey]:
-                heapq.heapify(self._pending[okey])
-            else:
-                del self._pending[okey]
+            if okey in self._pending:
+                for seq_item in self._pending[okey]:
+                    if seq_item.method == method and seq_item.seq == seq:
+                        self._pending[okey].remove(seq_item)
+                if self._pending[okey]:
+                    heapq.heapify(self._pending[okey])
+                else:
+                    del self._pending[okey]
             job = self._jobs.get(request_id, None)
             if job:
                 # aiojobs cancels the internal task upon job closing.
@@ -165,6 +167,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
         else:
             self._log.warning('cancellation of unknown or '
                               'not sent yet request: %r', request_id)
+        self.cleanup(request_id)
 
     def remove_if_empty(self, okey):
         if okey in self._pending and len(self._pending[okey]) == 0:
@@ -201,7 +204,7 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         self._futures[request_id] = fut
         return fut
 
-    async def cleanup(self, request_id):
+    def cleanup(self, request_id):
         self._futures.pop(request_id, None)
 
     async def cancel(self, request_id):

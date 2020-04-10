@@ -6,6 +6,7 @@ import logging
 from typing import (
     Any, Optional, Type, Union,
     Mapping, MutableMapping,
+    Tuple, Set, Dict,
     TYPE_CHECKING,
 )
 import secrets
@@ -35,6 +36,9 @@ from ..lower import (
 from .message import (
     RPCMessage, RPCMessageTypes,
 )
+from .types import (
+    RequestId,
+)
 if TYPE_CHECKING:
     from . import FunctionHandler
 
@@ -59,6 +63,10 @@ class Peer(AbstractChannel):
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
     _opener: Optional[Union[AbstractBinder, AbstractConnector]]
+
+    # The mapping from (peer ID, client request ID) -> server request ID
+    _req_idmap: Dict[Tuple[Any, RequestId], RequestId]
+
     _log: logging.Logger
     _debug_rpc: bool
 
@@ -99,7 +107,9 @@ class Peer(AbstractChannel):
                                     transport_opts=transport_opts)
         self._func_registry = {}
 
-        self._seq_id = 0
+        self._client_seq_id = 0
+        self._server_seq_id = 0
+        self._req_idmap = {}
 
         # incoming queues
         self._invocation_resolver = AsyncResolver()
@@ -134,6 +144,7 @@ class Peer(AbstractChannel):
             self._scheduler = await aiojobs.create_scheduler(
                 limit=self._max_concurrency,
             )
+        func_tasks: Set[asyncio.Task] = set()
         while True:
             try:
                 async with aclosing(self._connection.recv_message()) as agen:
@@ -141,19 +152,58 @@ class Peer(AbstractChannel):
                         # TODO: flow-control in transports or peer queues?
                         if raw_msg is None:
                             return
-                        msg = RPCMessage.decode(raw_msg, self._deserializer)
-                        if msg.msgtype == RPCMessageTypes.FUNCTION:
-                            func_handler = self._lookup_func(msg.method)
-                            asyncio.create_task(self._func_task(msg, func_handler))
-                        elif msg.msgtype == RPCMessageTypes.CANCEL:
-                            # TODO: change "await" to "create_task"
-                            # and take care of that task cancellation.
-                            await self._func_scheduler.cancel(msg.request_id)
-                        elif msg.msgtype in (RPCMessageTypes.RESULT,
-                                             RPCMessageTypes.FAILURE,
-                                             RPCMessageTypes.ERROR):
-                            self._invocation_resolver.resolve(msg.request_id, msg)
+                        request = RPCMessage.decode(raw_msg, self._deserializer)
+                        client_request_id = request.request_id
+                        server_request_id: Optional[RequestId]
+                        if request.msgtype == RPCMessageTypes.FUNCTION:
+                            server_seq_id = self._next_server_seq_id()
+                            server_request_id = (
+                                client_request_id[0],
+                                client_request_id[1],
+                                server_seq_id,
+                            )
+                            self._req_idmap[(request.peer_id, client_request_id)] = \
+                                server_request_id
+                            func_handler = self._lookup_func(request.method)
+                            task = asyncio.create_task(self._func_task(
+                                server_request_id,
+                                request,
+                                func_handler,
+                            ))
+                            func_tasks.add(task)
+                            task.add_done_callback(func_tasks.discard)
+                            task.add_done_callback(
+                                lambda task: self._req_idmap.pop(
+                                    (request.peer_id, client_request_id),
+                                    None,
+                                )
+                            )
+                        elif request.msgtype == RPCMessageTypes.CANCEL:
+                            server_request_id = self._req_idmap.pop(
+                                (request.peer_id, client_request_id),
+                                None,
+                            )
+                            if server_request_id is None:
+                                continue
+                            await asyncio.shield(
+                                self._func_scheduler.cancel(server_request_id)
+                            )
+                        elif request.msgtype in (RPCMessageTypes.RESULT,
+                                                 RPCMessageTypes.FAILURE,
+                                                 RPCMessageTypes.ERROR):
+                            self._invocation_resolver.resolve(
+                                client_request_id,
+                                request,
+                            )
             except asyncio.CancelledError:
+                pending_tasks = []
+                if func_tasks:
+                    for task in func_tasks:
+                        if not task.done():
+                            task.cancel()
+                            pending_tasks.append(task)
+                    await asyncio.wait(pending_tasks)
+                await asyncio.sleep(0)
                 break
             except Exception:
                 log.exception('unexpected error')
@@ -212,16 +262,26 @@ class Peer(AbstractChannel):
         # TODO: add proper cleanup for awaiting on
         # finishing of the "listen" coroutine's spawned tasks
 
-    async def _func_task(self, request: RPCMessage,
-                         handler: FunctionHandler):
-        rqst_id = request.request_id
+    def _next_client_seq_id(self) -> int:
+        current = self._client_seq_id
+        self._client_seq_id = (self._client_seq_id + 1) % SEQ_BITS
+        return current
+
+    def _next_server_seq_id(self) -> int:
+        current = self._server_seq_id
+        self._server_seq_id = (self._server_seq_id + 1) % SEQ_BITS
+        return current
+
+    async def _func_task(self, server_request_id: Tuple[str, str, int],
+                         request: RPCMessage,
+                         handler: FunctionHandler) -> None:
         try:
             await self._func_scheduler.schedule(
-                rqst_id,
+                server_request_id,
                 self._scheduler,
                 handler(request))
             try:
-                result = await self._func_scheduler.get_fut(rqst_id)
+                result = await self._func_scheduler.get_fut(server_request_id)
                 if result is CANCELLED:
                     return
             except asyncio.CancelledError:
@@ -235,7 +295,7 @@ class Peer(AbstractChannel):
                 assert not isinstance(result, Sentinel)
                 response = RPCMessage.result(request, result)
             finally:
-                await self._func_scheduler.cleanup(rqst_id)
+                self._func_scheduler.cleanup(server_request_id)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -254,7 +314,7 @@ class Peer(AbstractChannel):
             invoke_timeout = self._invoke_timeout
         if order_key is None:
             order_key = secrets.token_hex(8)
-        self._seq_id = (self._seq_id + 1) % SEQ_BITS
+        client_seq_id = self._next_client_seq_id()
         try:
             request: RPCMessage
             with timeout(invoke_timeout):
@@ -266,7 +326,7 @@ class Peer(AbstractChannel):
                             RPCMessageTypes.FUNCTION,
                             method,
                             order_key,
-                            self._seq_id,
+                            client_seq_id,
                             None,
                             await agen.asend(None),
                         )
@@ -284,7 +344,7 @@ class Peer(AbstractChannel):
                         RPCMessageTypes.FUNCTION,
                         method,
                         order_key,
-                        self._seq_id,
+                        client_seq_id,
                         None,
                         body,
                     )
