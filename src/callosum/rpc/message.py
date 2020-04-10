@@ -21,6 +21,7 @@ from ..abc import (
 )
 from ..exceptions import ConfigurationError
 from ..serialize import mpackb, munpackb
+from .types import RequestId
 
 
 # TODO(FUTURE): zero-copy serialization and de-serialization
@@ -111,7 +112,7 @@ class RPCMessage(AbstractMessage):
     body: Optional[Any]
 
     @property
-    def request_id(self) -> Tuple[str, str, int]:
+    def request_id(self) -> RequestId:
         return (self.method, self.order_key, self.client_seq_id)
 
     @classmethod

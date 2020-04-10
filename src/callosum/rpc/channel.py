@@ -6,7 +6,7 @@ import logging
 from typing import (
     Any, Optional, Type, Union,
     Mapping, MutableMapping,
-    Tuple, Set,
+    Tuple, Set, Dict,
     TYPE_CHECKING,
 )
 import secrets
@@ -36,6 +36,9 @@ from ..lower import (
 from .message import (
     RPCMessage, RPCMessageTypes,
 )
+from .types import (
+    RequestId,
+)
 if TYPE_CHECKING:
     from . import FunctionHandler
 
@@ -60,6 +63,10 @@ class Peer(AbstractChannel):
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
     _opener: Optional[Union[AbstractBinder, AbstractConnector]]
+
+    # The mapping from (peer ID, client request ID) -> server request ID
+    _req_idmap: Dict[Tuple[Any, RequestId], RequestId]
+
     _log: logging.Logger
     _debug_rpc: bool
 
@@ -147,6 +154,7 @@ class Peer(AbstractChannel):
                             return
                         request = RPCMessage.decode(raw_msg, self._deserializer)
                         client_request_id = request.request_id
+                        server_request_id: Optional[RequestId]
                         if request.msgtype == RPCMessageTypes.FUNCTION:
                             server_seq_id = self._next_server_seq_id()
                             server_request_id = (
