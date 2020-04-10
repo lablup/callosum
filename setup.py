@@ -25,6 +25,7 @@ install_requires = [
 build_requires = [
     'wheel>=0.33.6',
     'twine>=3.1.0',
+    'towncrier>=19.2.0',
 ]
 
 test_requires = [
