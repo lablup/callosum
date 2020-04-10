@@ -24,7 +24,7 @@ def test_rpcmessage_exception_serialization():
         msgtype=RPCMessageTypes.FUNCTION,
         method='dummy_function',
         order_key='x',
-        seq_id=1000,
+        client_seq_id=1000,
         metadata=NullMetadata(),
         body=b'{}',
     )
