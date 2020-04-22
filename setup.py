@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from typing import List
 from pathlib import Path
 import re
 
@@ -30,15 +31,15 @@ build_requires = [
 
 test_requires = [
     'Click>=7.0',
-    'pytest>=5.3',
-    'pytest-asyncio>=0.10',
+    'pytest~=5.4.1',
+    'pytest-asyncio>=0.11.0',
     'pytest-cov',
     'pytest-mock',
     'codecov',
 ]
 
-dev_requires = [
-    'pytest-sugar',
+dev_requires: List[str] = [
+    # 'pytest-sugar',
 ]
 
 lint_requires = [
