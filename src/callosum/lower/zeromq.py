@@ -305,7 +305,7 @@ class ZeroMQBaseTransport(BaseTransport):
             self._zap_task.cancel()
             await self._zap_task
         if self._zctx is not None:
-            self._zctx.term()
+            self._zctx.destroy()
 
 
 class ZeroMQRPCTransport(ZeroMQBaseTransport):
