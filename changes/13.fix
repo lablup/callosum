@@ -1,1 +1,0 @@
-lower.zeromq: Use destroy() for zmq context termination to improve stability and shutdown open socekts cleanly

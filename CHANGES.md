@@ -1,6 +1,28 @@
 Changes
 =======
 
+<!--
+    You should *NOT* be adding new change log entries to this file, this
+    file is managed by towncrier. You *may* edit previous change logs to
+    fix problems like typo corrections or such.
+
+    To add a new change log entry, please refer
+    https://pip.pypa.io/en/latest/development/contributing/#news-entries
+
+    We named the news folder "changes".
+
+    WARNING: Don't drop the last line!
+-->
+
+.. towncrier release notes start
+
+v0.9.5 (2020-05-12)
+-------------------
+
+#### Fixes
+* lower.zeromq: Use destroy() for zmq context termination to improve stability and shutdown open socekts cleanly ([#13](https://github.com/lablup/callosum/issues/13))
+
+
 v0.9.4 (2020-04-10)
 -------------------
 
@@ -10,17 +32,20 @@ v0.9.4 (2020-04-10)
 #### Miscellaneous
 * Adopt towncrier for changelog management [(#11)](https://github.com/lablup/callosum/issues/11)
 
+
 v0.9.3 (2020-03-20)
 -------------------
 
 * FIX: Mitigate bogus KeyError when cleaning up task futures in RPC servers that has caused event
   loop spinning.
 
+
 v0.9.2 (2020-02-28)
 -------------------
 
 * MAINTENANCE: Update dependencies and only specify the minimum versions since
   Callosum is a library.
+
 
 v0.9.1 (2020-01-05)
 -------------------
@@ -32,10 +57,12 @@ v0.9.1 (2020-01-05)
 
 * Update dependencies and remove unused ones.
 
+
 v0.9.0 (2019-12-06)
 -------------------
 
 * First public release with a working RPC based on ZeroMQ DEALER/ROUTER sockets.
+
 
 2018-05-02
 ----------
