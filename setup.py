@@ -42,7 +42,7 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    'flake8>=3.7.9',
+    'flake8>=3.8.1',
 ]
 
 typecheck_requires = [

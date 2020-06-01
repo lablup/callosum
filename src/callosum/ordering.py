@@ -114,7 +114,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
     __slots__ = ('_log', '_futures', '_tasks', '_pending')
 
-    _futures: Dict[_SeqItem, Union[TaskSentinel, asyncio.Future]]
+    _futures: Dict[_SeqItem, asyncio.Future]
     _tasks: Dict[_SeqItem, asyncio.Task]
     _pending: Dict[bytes, List[_SeqItem]]
 
@@ -162,7 +162,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
 
         task.add_done_callback(functools.partial(cb, head, request_id))
 
-    def get_fut(self, request_id) -> Union[TaskSentinel, Any]:
+    def get_fut(self, request_id) -> Awaitable[Union[TaskSentinel, Any]]:
         fut = self._futures[request_id]
         return fut
 
