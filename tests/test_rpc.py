@@ -86,7 +86,6 @@ async def dummy_client(
         transport=ZeroMQRPCTransport,
         serializer=lambda o: json.dumps(o).encode('utf8'),
         deserializer=lambda b: json.loads(b),
-        invoke_timeout=2.0,
     )
     async with client:
         await requester(client)
@@ -97,16 +96,22 @@ async def dummy_client(
 @pytest.mark.asyncio
 async def test_messaging_exit_ordered() -> None:
     done = asyncio.Event()
-    total = 5
+    total = 30
     call_results: List[int] = []
     return_results: List[int] = []
+    # a list of events to make fucntions to return in the reversed order
+    order_events = [asyncio.Event() for _ in range(total)]
 
     async def func(request: RPCMessage) -> Any:
-        # waits a short delay so that it return in the reversed order
         body = cast(Mapping[str, int], request.body)
         total = body['total']
         idx = body['idx']
-        await asyncio.sleep(0.1 * (total - idx))
+        if idx == 0:
+            await asyncio.sleep(0.01)
+            for j in range(total, 0, -1):
+                order_events[j - 1].set()
+                await asyncio.sleep(0)  # let the next waiter proceed
+        await order_events[idx].wait()
         return idx
 
     async def requester(client) -> None:
@@ -139,16 +144,23 @@ async def test_messaging_exit_ordered() -> None:
 @pytest.mark.asyncio
 async def test_messaging_key_ordered() -> None:
     done = asyncio.Event()
-    total = 5
+    total = 30
     call_results: List[int] = []
     return_results: List[int] = []
+    # a list of events to make fucntions to return in the reversed order
+    order_events = [asyncio.Event() for _ in range(total)]
 
     async def func(request: RPCMessage) -> int:
         # waits a short delay so that it return in the reversed order
         body = cast(Mapping[str, int], request.body)
         total = body['total']
         idx = body['idx']
-        await asyncio.sleep(0.1 * (total - idx))
+        if idx == 0:
+            await asyncio.sleep(0.01)
+            for j in range(total, 0, -1):
+                order_events[j - 1].set()
+                await asyncio.sleep(0)  # let the next waiter proceed
+        await order_events[idx].wait()
         return idx
 
     async def requester(client) -> None:
