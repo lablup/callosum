@@ -42,6 +42,9 @@ async def test_timeout(peer):
     except asyncio.TimeoutError:
         print('long_delay(): timeout occurred as expected '
               '(with per-call timeout)')
+    except Exception as e:
+        print('long_delay(): unexpected error', e)
+        sys.exit(1)
     else:
         print('long_delay(): timeout did not occur!')
         sys.exit(1)
@@ -53,6 +56,9 @@ async def test_timeout(peer):
     except asyncio.TimeoutError:
         print('long_delay(): timeout occurred as expected '
               '(with default timeout)')
+    except Exception as e:
+        print('long_delay(): unexpected error', e)
+        sys.exit(1)
     else:
         print('long_delay(): timeout did not occur!')
         sys.exit(1)
@@ -82,8 +88,9 @@ async def single_client() -> None:
         invoke_timeout=2.0)
     async with peer:
         await test_simple(peer)
-        await test_timeout(peer)
         await test_exception(peer)
+        await test_timeout(peer)
+        await test_simple(peer)
 
 
 async def overlapped_requests() -> None:
@@ -103,6 +110,7 @@ async def overlapped_requests() -> None:
         t7 = asyncio.create_task(test_simple(peer, initial_delay=1.0))
         results = await asyncio.gather(t1, t2, t3, t4, t5, t6, t7,
                                        return_exceptions=True)
+        print(results)
         if any(map(lambda r: isinstance(r, Exception), results)):
             print('There were failed clients.')
             sys.exit(1)

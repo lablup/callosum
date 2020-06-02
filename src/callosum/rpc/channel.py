@@ -181,9 +181,7 @@ class Peer(AbstractChannel):
                             )
                             if server_request_id is None:
                                 continue
-                            await asyncio.shield(
-                                self._func_scheduler.cancel(server_request_id)
-                            )
+                            await self._func_scheduler.cancel(server_request_id)
                         elif request.msgtype in (RPCMessageTypes.RESULT,
                                                  RPCMessageTypes.FAILURE,
                                                  RPCMessageTypes.CANCELLED,
@@ -362,8 +360,6 @@ class Peer(AbstractChannel):
             if not server_cancelled:
                 cancel_request = RPCMessage.cancel(request)
                 await self._outgoing_queue.put(cancel_request)
-                # cancel myself as well
-                self._invocation_resolver.cancel(request.request_id)
             raise
         except Exception:
             raise

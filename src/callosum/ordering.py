@@ -144,7 +144,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
         task = asyncio.create_task(coro)
         self._tasks[request_id] = task
 
-        def cb(seq_item, rqst_id, task):
+        def cb(seq_item, rqst_id, fut, task):
             _, okey, _ = rqst_id
             try:
                 s = heapq.heappop(self._pending[okey])
@@ -160,41 +160,42 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             finally:
                 seq_item.ev.set()
 
-        task.add_done_callback(functools.partial(cb, head, request_id))
+        task.add_done_callback(functools.partial(cb, head, request_id, fut))
 
     def get_fut(self, request_id) -> Awaitable[Union[TaskSentinel, Any]]:
-        fut = self._futures[request_id]
-        return fut
+        return self._futures[request_id]
 
     def cleanup(self, request_id) -> None:
         self._futures.pop(request_id, None)
         okey = request_id[1]
-        if okey in self._pending and len(self._pending[okey]) == 0:
+        if okey in self._pending:
+            for seq_item in self._pending[okey]:
+                if seq_item.seq == request_id[2]:
+                    self._pending[okey].remove(seq_item)
+                    break
+        if len(self._pending[okey]) == 0:
             del self._pending[okey]
-        if request_id in self._tasks:
-            self._tasks.pop(request_id, None)
+        else:
+            heapq.heapify(self._pending[okey])
+        self._tasks.pop(request_id, None)
 
     async def cancel(self, request_id) -> None:
         method, okey, seq = request_id
-        try:
-            if request_id in self._futures:
-                if okey in self._pending:
-                    for seq_item in self._pending[okey]:
-                        if seq_item.method == method and seq_item.seq == seq:
-                            self._pending[okey].remove(seq_item)
-                    if self._pending[okey]:
-                        heapq.heapify(self._pending[okey])
-                    else:
-                        del self._pending[okey]
-                task = self._tasks.get(request_id, None)
-                if task is not None and not task.done():
-                    task.cancel()
-                    await task
-            else:
-                self._log.warning('cancellation of unknown or '
-                                  'not sent yet request: %r', request_id)
-        finally:
-            self.cleanup(request_id)
+        if request_id in self._futures:
+            task = self._tasks.get(request_id, None)
+            if task is None:
+                return
+            if not task.done():
+                task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            # The task callback will notify the scheduler caller (upper).
+            # The scheduler caller (upper) will call cleanup.
+        else:
+            self._log.warning('cancellation of unknown or '
+                              'not sent yet request: %r', request_id)
 
 
 class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
@@ -217,16 +218,16 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
         self._tasks[request_id] = task
 
     async def get_fut(self, request_id) -> Union[TaskSentinel, Any]:
-        ret = self._tasks.pop(request_id, TaskSentinel.CANCELLED)
-        if isinstance(ret, TaskSentinel):
-            return ret
-        return await ret
+        task = self._tasks.pop(request_id, TaskSentinel.CANCELLED)
+        if isinstance(task, TaskSentinel):
+            return task
+        return await task
 
     def cleanup(self, request_id) -> None:
         self._tasks.pop(request_id, None)
 
     async def cancel(self, request_id) -> None:
-        task = self._tasks.pop(request_id, TaskSentinel.CANCELLED)
+        task = self._tasks.get(request_id, TaskSentinel.CANCELLED)
         if task is TaskSentinel.CANCELLED:
             return
         if not task.done():
