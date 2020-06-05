@@ -4,16 +4,18 @@ import asyncio
 import functools
 import logging
 from typing import (
-    Any, Callable, Optional, Type, Union,
-    Mapping,
+    Any,
     List,
+    Mapping,
+    Optional,
+    Type,
+    Union,
 )
 
-import aiojobs
 from aiotools import aclosing
 
 from ..abc import (
-    Sentinel, CLOSED,
+    QueueSentinel,
     AbstractChannel,
     AbstractDeserializer, AbstractSerializer,
 )
@@ -26,6 +28,7 @@ from ..lower import (
     BaseTransport,
 )
 from .message import StreamMessage
+from .types import ConsumerCallback
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +40,7 @@ class Publisher(AbstractChannel):
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractBinder]
-    _outgoing_queue: asyncio.Queue[Union[Sentinel, StreamMessage]]
+    _outgoing_queue: asyncio.Queue[Union[QueueSentinel, StreamMessage]]
     _send_task: Optional[asyncio.Task]
     _serializer: AbstractSerializer
 
@@ -71,9 +74,8 @@ class Publisher(AbstractChannel):
         while True:
             try:
                 msg = await self._outgoing_queue.get()
-                if msg is CLOSED:
+                if msg is QueueSentinel.CLOSED:
                     break
-                assert not isinstance(msg, Sentinel)
                 await self._connection.send_message(
                     msg.encode(self._serializer))
             except asyncio.CancelledError:
@@ -93,7 +95,7 @@ class Publisher(AbstractChannel):
         if self._send_task is not None:
             if self._opener is not None:
                 await self._opener.__aexit__(None, None, None)
-            await self._outgoing_queue.put(CLOSED)
+            await self._outgoing_queue.put(QueueSentinel.CLOSED)
             await self._send_task
         if self._transport is not None:
             await self._transport.close()
@@ -106,9 +108,6 @@ class Publisher(AbstractChannel):
 class Consumer(AbstractChannel):
     '''
     Represents a unidirectional message consumer.
-    If no scheduler is provided as a parameter,
-    aiojobs scheduler with maximum concurrency
-    of max_concurrency will be used.
     '''
 
     _connection: Optional[AbstractConnection]
@@ -116,6 +115,7 @@ class Consumer(AbstractChannel):
     _incoming_queue: asyncio.Queue[StreamMessage]
     _recv_task: Optional[asyncio.Task]
     _deserializer: AbstractDeserializer
+    _handler_registry: List[ConsumerCallback]
 
     def __init__(
         self, *,
@@ -138,26 +138,24 @@ class Consumer(AbstractChannel):
         self._transport = transport(authenticator=authenticator,
                                     transport_opts=transport_opts)
         self._scheduler = scheduler
-        self._max_concurrency = max_concurrency
+        self._concurrency_sema = asyncio.Semaphore(max_concurrency)
 
         self._incoming_queue = asyncio.Queue()
-        self._handler_registry: List[Callable] = []
+        self._handler_registry = []
         self._recv_task = None
 
         self._log = logging.getLogger(__name__ + '.Consumer')
 
-    def add_handler(self,
-                    callback: Callable) -> None:
+    def add_handler(self, callback: ConsumerCallback) -> None:
         self._handler_registry.append(callback)
+
+    async def _task_wrapper(self, handler: ConsumerCallback, msg: Any) -> None:
+        async with self._concurrency_sema:
+            await handler(msg)
 
     async def _recv_loop(self) -> None:
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
-        if self._scheduler is None:
-            self._scheduler = await aiojobs.create_scheduler(
-                limit=self._max_concurrency,
-            )
-        loop = asyncio.get_running_loop()
         while True:
             try:
                 async with aclosing(self._connection.recv_message()) as agen:
@@ -166,12 +164,12 @@ class Consumer(AbstractChannel):
                             return
                         msg = StreamMessage.decode(raw_msg, self._deserializer)
                         for handler in self._handler_registry:
-                            if (asyncio.iscoroutine(handler) or
-                                    asyncio.iscoroutinefunction(handler)):
-                                await self._scheduler.spawn(handler(msg))
+                            if asyncio.iscoroutinefunction(handler):
+                                asyncio.create_task(self._task_wrapper(handler, msg))
+                                # TODO: keep weak-refs to tasks and use it to
+                                #       cancel running tasks upon shutdown
                             else:
-                                handler = functools.partial(handler, msg)
-                                loop.call_soon(handler)
+                                handler(msg)
             except asyncio.CancelledError:
                 break
             except Exception:

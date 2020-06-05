@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import abc
+import enum
 from typing import (
-    Any, Final, Optional,
-    Protocol,
+    Any,
     NamedTuple,
+    Optional,
+    Protocol,
 )
 
 
@@ -14,24 +16,20 @@ class RawHeaderBody(NamedTuple):
     peer_id: Optional[bytes]
 
 
-class Sentinel(object):
-    '''
+class QueueSentinel(enum.Enum):
+    """
     A category of special singleton objects that represents
     control-plane events in data-plane RX/TX queues.
-    '''
-    pass
+    """
+    CLOSED = 1
 
 
-'''
-A sentinel object that represents the closing event of a queue.
-'''
-CLOSED: Final = Sentinel()
-
-
-'''
-A sentinel object that represents task cancellation.
-'''
-CANCELLED: Final = Sentinel()
+class TaskSentinel(enum.Enum):
+    """
+    A category of special singleton objects that represents
+    special status of asyncio tasks.
+    """
+    CANCELLED = 1
 
 
 class AbstractSerializer(Protocol):
@@ -52,23 +50,23 @@ class AbstractMessage(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def decode(cls, raw_msg: RawHeaderBody,
                deserializer: AbstractDeserializer) -> AbstractMessage:
-        '''
+        """
         Decodes the message and applies deserializer to the body.
         Returns an instance of inheriting message class.
 
         Args:
             deserializer: Body deserializer.
-        '''
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def encode(self, serializer: AbstractSerializer) -> RawHeaderBody:
-        '''
+        """
         Encodes the message and applies serializer to body.
 
         Args:
             serializer: Body serializer.
-        '''
+        """
         raise NotImplementedError
 
 

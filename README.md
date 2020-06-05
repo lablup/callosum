@@ -24,7 +24,6 @@ Features
   - Native timeout and cancellation support
   - Explicit server-to-client error propagation including stringified tracebacks
   - Order preserving based on user-defined keys while keeping executions asynchronous
-  - Concurrency limits based on [aiojobs](https://github.com/aio-libs/aiojobs)
 * Streaming
   - Broadcast & shared pipelines
 * Optional client authentication and encrypted communication

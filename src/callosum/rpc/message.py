@@ -76,11 +76,12 @@ class NullMetadata(Metadata):
 
 class RPCMessageTypes(enum.IntEnum):
     NULL = 0
-    FUNCTION = 1  # request for a function
-    RESULT = 2    # result of functions
-    FAILURE = 3   # error from user handlers
-    ERROR = 4     # error from callosum or underlying libraries
-    CANCEL = 5    # client-side timeout or cancel request
+    FUNCTION = 1   # request for a function
+    RESULT = 2     # result of functions
+    FAILURE = 3    # error from user handlers
+    ERROR = 4      # error from callosum or underlying libraries
+    CANCEL = 5     # client-side timeout or cancel request
+    CANCELLED = 6  # server-side timeout or cancel request
 
 
 # mapped from RPCMessageTypes as index
@@ -90,6 +91,7 @@ metadata_types = (
     ResultMetadata,
     ErrorMetadata,
     ErrorMetadata,  # intended duplication
+    NullMetadata,
     NullMetadata,
 )
 
@@ -169,11 +171,24 @@ class RPCMessage(AbstractMessage):
     def cancel(cls, request):
         '''
         Creates an RPCMessage instance represents a cancellation of
-        the given request.
+        the given request triggered from the client-side.
         '''
         return cls(
             request.peer_id,
             RPCMessageTypes.CANCEL,
+            request.method, request.order_key, request.client_seq_id,
+            NullMetadata(), None,
+        )
+
+    @classmethod
+    def cancelled(cls, request):
+        '''
+        Creates an RPCMessage instance represents a cancellation of
+        the given request triggered from the server-side.
+        '''
+        return cls(
+            request.peer_id,
+            RPCMessageTypes.CANCELLED,
             request.method, request.order_key, request.client_seq_id,
             NullMetadata(), None,
         )

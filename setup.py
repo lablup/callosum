@@ -14,8 +14,7 @@ def read_src_version():
 
 
 install_requires = [
-    'aiojobs>=0.2.2',
-    'aiotools>=0.8.5',
+    'aiotools>=0.9.1',
     'async_timeout>=3.0.1',
     'attrs>=19.3.0',
     'python-dateutil>=2.8.1',
@@ -43,7 +42,7 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    'flake8>=3.7.9',
+    'flake8>=3.8.1',
 ]
 
 typecheck_requires = [

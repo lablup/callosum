@@ -61,11 +61,14 @@ async def handle_show_memory_stat(request):
     for stat in top_stats[:10]:
         print(stat)
     print("[ Scheduler Queue Status ]")
-    print('_jobs', len(scheduler._jobs))
-    print('_futures', len(scheduler._futures))
-    if hasattr(scheduler, '_pending'):
-        print('_pending', len(scheduler._pending))
-        print(scheduler._pending)
+    if isinstance(scheduler, KeySerializedAsyncScheduler):
+        print('_tasks', len(scheduler._tasks))
+        print('_futures', len(scheduler._futures))
+        if hasattr(scheduler, '_pending'):
+            print('_pending', len(scheduler._pending))
+            print(scheduler._pending)
+    elif isinstance(scheduler, ExitOrderedAsyncScheduler):
+        print('_tasks', len(scheduler._tasks))
 
 
 async def handle_long_delay(request):
@@ -134,7 +137,7 @@ async def serve(scheduler_type: str) -> None:
 
 @click.command()
 @click.argument('scheduler_type',
-                default='key-serialized',
+                default='exit-ordered',
                 type=click.Choice(scheduler_types.keys()))
 def main(scheduler_type):
     asyncio.run(serve(scheduler_type))

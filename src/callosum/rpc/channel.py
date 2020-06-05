@@ -9,15 +9,14 @@ from typing import (
     Tuple, Set, Dict,
     TYPE_CHECKING,
 )
-import secrets
 
-import aiojobs
 from aiotools import aclosing
 from async_timeout import timeout
 import attr
 
 from ..abc import (
-    Sentinel, CLOSED, CANCELLED,
+    QueueSentinel,
+    TaskSentinel,
     AbstractChannel,
     AbstractDeserializer, AbstractSerializer,
 )
@@ -25,7 +24,7 @@ from ..auth import AbstractAuthenticator
 from .exceptions import RPCUserError, RPCInternalError
 from ..ordering import (
     AsyncResolver, AbstractAsyncScheduler,
-    KeySerializedAsyncScheduler, SEQ_BITS,
+    ExitOrderedAsyncScheduler, SEQ_BITS,
 )
 from ..lower import (
     AbstractAddress,
@@ -59,7 +58,7 @@ class Peer(AbstractChannel):
     _deserializer: AbstractDeserializer
     _serializer: AbstractSerializer
     _func_registry: MutableMapping[str, FunctionHandler]
-    _outgoing_queue: asyncio.Queue[Union[Sentinel, RPCMessage]]
+    _outgoing_queue: asyncio.Queue[Union[QueueSentinel, RPCMessage]]
     _recv_task: Optional[asyncio.Task]
     _send_task: Optional[asyncio.Task]
     _opener: Optional[Union[AbstractBinder, AbstractConnector]]
@@ -114,7 +113,7 @@ class Peer(AbstractChannel):
         # incoming queues
         self._invocation_resolver = AsyncResolver()
         if scheduler is None:
-            scheduler = KeySerializedAsyncScheduler()
+            scheduler = ExitOrderedAsyncScheduler()
         self._func_scheduler = scheduler
 
         # there is only one outgoing queue
@@ -140,10 +139,6 @@ class Peer(AbstractChannel):
         '''
         if self._connection is None:
             raise RuntimeError('consumer is not opened yet.')
-        if self._scheduler is None:
-            self._scheduler = await aiojobs.create_scheduler(
-                limit=self._max_concurrency,
-            )
         func_tasks: Set[asyncio.Task] = set()
         while True:
             try:
@@ -178,6 +173,7 @@ class Peer(AbstractChannel):
                                     None,
                                 )
                             )
+                            await asyncio.sleep(0)
                         elif request.msgtype == RPCMessageTypes.CANCEL:
                             server_request_id = self._req_idmap.pop(
                                 (request.peer_id, client_request_id),
@@ -185,16 +181,16 @@ class Peer(AbstractChannel):
                             )
                             if server_request_id is None:
                                 continue
-                            await asyncio.shield(
-                                self._func_scheduler.cancel(server_request_id)
-                            )
+                            await self._func_scheduler.cancel(server_request_id)
                         elif request.msgtype in (RPCMessageTypes.RESULT,
                                                  RPCMessageTypes.FAILURE,
+                                                 RPCMessageTypes.CANCELLED,
                                                  RPCMessageTypes.ERROR):
                             self._invocation_resolver.resolve(
                                 client_request_id,
                                 request,
                             )
+                            await asyncio.sleep(0)
             except asyncio.CancelledError:
                 pending_tasks = []
                 if func_tasks:
@@ -217,9 +213,8 @@ class Peer(AbstractChannel):
         while True:
             try:
                 msg = await self._outgoing_queue.get()
-                if msg is CLOSED:
+                if msg is QueueSentinel.CLOSED:
                     break
-                assert not isinstance(msg, Sentinel)
                 await self._connection.send_message(
                     msg.encode(self._serializer))
             except asyncio.CancelledError:
@@ -247,7 +242,7 @@ class Peer(AbstractChannel):
 
     async def __aexit__(self, *exc_info) -> None:
         if self._send_task is not None:
-            await self._outgoing_queue.put(CLOSED)
+            await self._outgoing_queue.put(QueueSentinel.CLOSED)
             await self._send_task
         if self._recv_task is not None:
             # TODO: pass exception description, e.g. during invoke timeout
@@ -255,8 +250,6 @@ class Peer(AbstractChannel):
                 await self._opener.__aexit__(*exc_info)
             self._recv_task.cancel()
             await self._recv_task
-        if self._scheduler is not None:
-            await self._scheduler.close()
         if self._transport is not None:
             await self._transport.close()
         # TODO: add proper cleanup for awaiting on
@@ -264,12 +257,12 @@ class Peer(AbstractChannel):
 
     def _next_client_seq_id(self) -> int:
         current = self._client_seq_id
-        self._client_seq_id = (self._client_seq_id + 1) % SEQ_BITS
+        self._client_seq_id = (self._client_seq_id + 1) % (2 ** SEQ_BITS)
         return current
 
     def _next_server_seq_id(self) -> int:
         current = self._server_seq_id
-        self._server_seq_id = (self._server_seq_id + 1) % SEQ_BITS
+        self._server_seq_id = (self._server_seq_id + 1) % (2 ** SEQ_BITS)
         return current
 
     async def _func_task(self, server_request_id: Tuple[str, str, int],
@@ -278,12 +271,11 @@ class Peer(AbstractChannel):
         try:
             await self._func_scheduler.schedule(
                 server_request_id,
-                self._scheduler,
                 handler(request))
             try:
                 result = await self._func_scheduler.get_fut(server_request_id)
-                if result is CANCELLED:
-                    return
+                if result is TaskSentinel.CANCELLED:
+                    response = RPCMessage.cancelled(request)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -292,18 +284,18 @@ class Peer(AbstractChannel):
                     self._log.exception('RPC user error')
                 response = RPCMessage.failure(request)
             else:
-                assert not isinstance(result, Sentinel)
                 response = RPCMessage.result(request, result)
-            finally:
-                self._func_scheduler.cleanup(server_request_id)
         except asyncio.CancelledError:
+            response = RPCMessage.cancelled(request)
             raise
         except Exception:
             if self._debug_rpc:
                 self._log.exception('RPC internal error')
             # exception from our parts => error
             response = RPCMessage.error(request)
-        await self._outgoing_queue.put(response)
+        finally:
+            self._func_scheduler.cleanup(server_request_id)
+            await self._outgoing_queue.put(response)
 
     async def invoke(self, method: str, body, *,
                      order_key=None, invoke_timeout=None):
@@ -313,10 +305,11 @@ class Peer(AbstractChannel):
         if invoke_timeout is None:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
-            order_key = secrets.token_hex(8)
+            order_key = b''
         client_seq_id = self._next_client_seq_id()
         try:
             request: RPCMessage
+            server_cancelled = False
             with timeout(invoke_timeout):
                 if callable(body):
                     # The user is using an upper-layer adaptor.
@@ -354,6 +347,9 @@ class Peer(AbstractChannel):
                     upper_result = response.body
             if response.msgtype == RPCMessageTypes.RESULT:
                 pass
+            elif response.msgtype == RPCMessageTypes.CANCELLED:
+                server_cancelled = True
+                raise asyncio.CancelledError
             elif response.msgtype == RPCMessageTypes.FAILURE:
                 raise RPCUserError(*attr.astuple(response.metadata))
             elif response.msgtype == RPCMessageTypes.ERROR:
@@ -361,10 +357,9 @@ class Peer(AbstractChannel):
             return upper_result
         except (asyncio.TimeoutError, asyncio.CancelledError):
             # propagate cancellation to the connected peer
-            cancel_request = RPCMessage.cancel(request)
-            await self._outgoing_queue.put(cancel_request)
-            # cancel myself as well
-            self._invocation_resolver.cancel(request.request_id)
+            if not server_cancelled:
+                cancel_request = RPCMessage.cancel(request)
+                await self._outgoing_queue.put(cancel_request)
             raise
         except Exception:
             raise
