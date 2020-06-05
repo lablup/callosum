@@ -16,6 +16,22 @@ Changes
 
 .. towncrier release notes start
 
+v0.9.6 (2020-06-05)
+-------------------
+
+
+#### Features
+* `upper.rpc`: Support server-side cancellation and propagation to clients by adding the `CANCELLED` RPC message type ([#14](https://github.com/lablup/callosum/issues/14))
+
+#### Deprecations
+* Drop use of aiojobs in favor of native semaphores for limiting the task concurrency and less clutters on job scheduling semantics ([#14](https://github.com/lablup/callosum/issues/14))
+
+#### Fixes
+* Stability updates for the RPC layer: ([#14](https://github.com/lablup/callosum/issues/14))
+  - Fix wrong message sequence calcuation with `SEQ_BITS` and clarify the roles of `cleanup()` and `cancel()` methods in the schedulers.
+  - Now we use the exit-ordered scheduler by default.
+
+
 v0.9.5 (2020-05-12)
 -------------------
 

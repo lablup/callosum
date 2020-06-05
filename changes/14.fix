@@ -1,3 +1,0 @@
-Stability updates for the RPC layer:
-- Fix wrong message sequence calcuation with `SEQ_BITS` and clarify the roles of `cleanup()` and `cancel()` methods in the schedulers.
-- Now we use the exit-ordered scheduler by default.

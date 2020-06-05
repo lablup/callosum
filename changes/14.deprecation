@@ -1,1 +1,0 @@
-Drop use of aiojobs in favor of native semaphores for limiting the task concurrency and less clutters on job scheduling semantics
