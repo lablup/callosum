@@ -24,7 +24,7 @@ from ..auth import AbstractAuthenticator
 from .exceptions import RPCUserError, RPCInternalError
 from ..ordering import (
     AsyncResolver, AbstractAsyncScheduler,
-    KeySerializedAsyncScheduler, SEQ_BITS,
+    ExitOrderedAsyncScheduler, SEQ_BITS,
 )
 from ..lower import (
     AbstractAddress,
@@ -113,7 +113,7 @@ class Peer(AbstractChannel):
         # incoming queues
         self._invocation_resolver = AsyncResolver()
         if scheduler is None:
-            scheduler = KeySerializedAsyncScheduler()
+            scheduler = ExitOrderedAsyncScheduler()
         self._func_scheduler = scheduler
 
         # there is only one outgoing queue
