@@ -16,9 +16,15 @@ Changes
 
 .. towncrier release notes start
 
-v0.9.6 (2020-06-05)
+v0.9.7 (2020-12-22)
 -------------------
 
+#### Features
+* Provide `repr()` of exceptions in RPC user/internal errors for better application-level error logging ([#15](https://github.com/lablup/callosum/issues/15))
+
+
+v0.9.6 (2020-06-05)
+-------------------
 
 #### Features
 * `upper.rpc`: Support server-side cancellation and propagation to clients by adding the `CANCELLED` RPC message type ([#14](https://github.com/lablup/callosum/issues/14))
