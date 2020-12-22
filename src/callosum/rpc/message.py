@@ -146,7 +146,11 @@ class RPCMessage(AbstractMessage):
             request.peer_id,
             RPCMessageTypes.FAILURE,
             request.method, request.order_key, request.client_seq_id,
-            ErrorMetadata(exc_info[0].__name__, repr(exc_info[1]), traceback.format_exc()),
+            ErrorMetadata(
+                exc_info[0].__name__,
+                repr(exc_info[1]),
+                traceback.format_exc(),
+            ),
             None,
         )
 
@@ -164,7 +168,11 @@ class RPCMessage(AbstractMessage):
             request.peer_id,
             RPCMessageTypes.ERROR,
             request.method, request.order_key, request.client_seq_id,
-            ErrorMetadata(exc_info[0].__name__, repr(exc_info[1]), traceback.format_exc()),
+            ErrorMetadata(
+                exc_info[0].__name__,
+                repr(exc_info[1]),
+                traceback.format_exc(),
+            ),
             None,
         )
 
