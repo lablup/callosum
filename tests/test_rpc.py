@@ -38,7 +38,7 @@ def test_metadata_serialization():
     out = NullMetadata.decode(data)
     assert out == orig
 
-    orig = ErrorMetadata('MyError', 'this is a long traceback')
+    orig = ErrorMetadata('MyError', 'MyError()', 'this is a long traceback')
     data = orig.encode()
     out = ErrorMetadata.decode(data)
     assert out == orig
