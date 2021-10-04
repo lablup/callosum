@@ -49,7 +49,12 @@ class AbstractBinder(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        **transport_opts,
+    ) -> None:
         self.transport = transport
         self.addr = addr
 
@@ -72,7 +77,12 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        **transport_opts,
+    ) -> None:
         self.transport = transport
         self.addr = addr
 
@@ -108,7 +118,7 @@ class BaseTransport(metaclass=abc.ABCMeta):
         **kwargs,
     ) -> None:
         self.authenticator = authenticator
-        self.transport_opts = transport_opts
+        self.transport_opts = transport_opts or {}
 
     def bind(self, bind_addr: AbstractAddress) -> AbstractBinder:
         return type(self).binder_cls(self, bind_addr, **self.transport_opts)

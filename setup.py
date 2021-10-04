@@ -46,7 +46,8 @@ lint_requires = [
 ]
 
 typecheck_requires = [
-    'mypy>=0.760',
+    'mypy>=0.910',
+    'types-python-dateutil',
 ]
 
 docs_requires = [

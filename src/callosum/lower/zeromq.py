@@ -191,7 +191,10 @@ class ZeroMQMonitorMixin:
         try:
             while self._monitor_sock.poll():
                 msg = zmq.utils.monitor.recv_monitor_message(self._monitor_sock)
-                msg['description'] = self.EVENT_MAP.get(msg['event'], str(msg['event']))
+                msg['description'] = self.EVENT_MAP.get(
+                    msg['event'],
+                    str(msg['event']),
+                )
                 log.debug("monitor[%s] event: %r", self.addr, msg)
                 if msg['event'] == zmq.EVENT_MONITOR_STOPPED:
                     break
