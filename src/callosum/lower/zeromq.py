@@ -201,6 +201,8 @@ class ZeroMQMonitorMixin:
                 log.debug("monitor[%s] event: %r", self.addr, msg)
                 if msg['event'] == zmq.EVENT_MONITOR_STOPPED:
                     break
+        except Exception:
+            log.exception("monitor[%s] unexpected error", self.addr)
         finally:
             self._monitor_sock.close()
             log.debug("monitor[%s] closed", self.addr)
