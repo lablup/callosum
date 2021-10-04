@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import logging
 from typing import (
     AsyncGenerator,
     ClassVar, Type,
     Optional, Tuple, Union,
 )
+import secrets
+import sys
 
 import attr
 import zmq, zmq.asyncio, zmq.utils.monitor
@@ -188,12 +189,13 @@ class ZeroMQMonitorMixin:
         zmq.EVENT_ALL: "all",
     }
 
-    def _monitor(self) -> None:
+    async def _monitor(self) -> None:
         assert self._monitor_sock is not None
         log = logging.getLogger('callosum.lower.zeromq.monitor')
         try:
-            while self._monitor_sock.poll():
-                msg = zmq.utils.monitor.recv_monitor_message(self._monitor_sock)
+            while (await self._monitor_sock.poll()):
+                raw_msg = await self._monitor_sock.recv_multipart()
+                msg = zmq.utils.monitor.parse_monitor_message(raw_msg)
                 msg['description'] = self.EVENT_MAP.get(
                     msg['event'],
                     str(msg['event']),
@@ -230,7 +232,6 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
-        loop = asyncio.get_running_loop()
         server_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             server_id = await self.transport.authenticator.server_identity()
@@ -240,11 +241,15 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         for key, value in self.transport._zsock_opts.items():
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
-            self._monitor_sock = server_sock.get_monitor_socket()
-            self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
-            self._monitor_task = loop.run_in_executor(
-                self._monitor_executor, self._monitor,
-            )
+            log = logging.getLogger('callosum.lower.zeromq.monitor')
+            try:
+                monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
+                server_sock.get_monitor_socket(addr=monitor_addr)
+                self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
+                self._monitor_sock.connect(monitor_addr)
+                self._monitor_task = asyncio.create_task(self._monitor())
+            except Exception:
+                log.exception("unexpected error while making monitor socket")
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -257,7 +262,6 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
-            self._monitor_executor.shutdown()
 
 
 class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
@@ -282,7 +286,6 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
-        loop = asyncio.get_running_loop()
         client_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             auth = self.transport.authenticator
@@ -296,11 +299,15 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         for key, value in self.transport._zsock_opts.items():
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
-            self._monitor_sock = client_sock.get_monitor_socket()
-            self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
-            self._monitor_task = loop.run_in_executor(
-                self._monitor_executor, self._monitor,
-            )
+            log = logging.getLogger('callosum.lower.zeromq.monitor')
+            try:
+                monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
+                client_sock.get_monitor_socket(addr=monitor_addr)
+                self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
+                self._monitor_sock.connect(monitor_addr)
+                self._monitor_task = asyncio.create_task(self._monitor())
+            except Exception:
+                log.exception("unexpected error while making monitor socket")
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -313,7 +320,6 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
-            self._monitor_executor.shutdown()
 
 
 class ZeroMQRouterBinder(ZeroMQBaseBinder):
