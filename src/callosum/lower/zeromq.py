@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 from typing import (
     AsyncGenerator,
@@ -236,7 +237,8 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
             self._monitor_sock = server_sock.get_monitor_socket()
-            self._monitor_task = loop.run_in_executor(None, self._monitor)
+            self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
+            self._monitor_task = loop.run_in_executor(self._monitor_executor, self._monitor)
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -249,6 +251,7 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
+            self._monitor_executor.shutdown()
 
 
 class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
@@ -288,7 +291,8 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
             self._monitor_sock = client_sock.get_monitor_socket()
-            self._monitor_task = loop.run_in_executor(None, self._monitor)
+            self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
+            self._monitor_task = loop.run_in_executor(self._monitor_executor, self._monitor)
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -301,6 +305,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
+            self._monitor_executor.shutdown()
 
 
 class ZeroMQRouterBinder(ZeroMQBaseBinder):
