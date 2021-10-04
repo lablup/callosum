@@ -137,6 +137,7 @@ class ZeroMQRPCConnection(AbstractConnection):
 
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         assert not self.transport._closed
+        assert self.transport._sock is not None
         *pre, raw_header, raw_body = await self.transport._sock.recv_multipart()
         if len(pre) > 0:
             # server
@@ -148,6 +149,7 @@ class ZeroMQRPCConnection(AbstractConnection):
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
         assert not self.transport._closed
+        assert self.transport._sock is not None
         peer_id = raw_msg.peer_id
         if peer_id is not None:
             # server
@@ -238,7 +240,9 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         if self._attach_monitor:
             self._monitor_sock = server_sock.get_monitor_socket()
             self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
-            self._monitor_task = loop.run_in_executor(self._monitor_executor, self._monitor)
+            self._monitor_task = loop.run_in_executor(
+                self._monitor_executor, self._monitor,
+            )
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -292,7 +296,9 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         if self._attach_monitor:
             self._monitor_sock = client_sock.get_monitor_socket()
             self._monitor_executor = concurrent.futures.ThreadPoolExecutor()
-            self._monitor_task = loop.run_in_executor(self._monitor_executor, self._monitor)
+            self._monitor_task = loop.run_in_executor(
+                self._monitor_executor, self._monitor,
+            )
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -375,7 +381,7 @@ class ZeroMQBaseTransport(BaseTransport):
         super().__init__(authenticator, **kwargs)
         if self.authenticator:
             self._zap_server = ZAPServer(self.authenticator)
-            self._zap_task = loop.create_task(self.authenticator.serve())
+            self._zap_task = loop.create_task(self._zap_server.serve())
         self._zctx = zmq.asyncio.Context()
         # Keep sockets during the transport lifetime.
         self._sock = None
