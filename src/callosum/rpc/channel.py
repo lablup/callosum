@@ -213,10 +213,13 @@ class Peer(AbstractChannel):
         while True:
             try:
                 msg = await self._outgoing_queue.get()
-                if msg is QueueSentinel.CLOSED:
-                    break
-                await self._connection.send_message(
-                    msg.encode(self._serializer))
+                try:
+                    if msg is QueueSentinel.CLOSED:
+                        break
+                    await self._connection.send_message(
+                        msg.encode(self._serializer))
+                finally:
+                    self._outgoing_queue.task_done()
             except asyncio.CancelledError:
                 break
             except Exception:
