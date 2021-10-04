@@ -358,11 +358,11 @@ class ZeroMQBaseTransport(BaseTransport):
     binder_cls: ClassVar[Type[ZeroMQBaseBinder]]
     connector_cls: ClassVar[Type[ZeroMQBaseConnector]]
 
-    def __init__(self, authenticator, **kwargs):
+    def __init__(self, authenticator, **kwargs) -> None:
         loop = asyncio.get_running_loop()
         self._zap_server = None
         self._zap_task = None
-        transport_opts = kwargs.pop('transport_opts', {})
+        transport_opts = kwargs.get('transport_opts', {})
         self._zsock_opts = {
             zmq.LINGER: 100,
             **transport_opts.get('zsock_opts', {}),
@@ -376,12 +376,12 @@ class ZeroMQBaseTransport(BaseTransport):
         self._sock = None
 
     @property
-    def _closed(self):
+    def _closed(self) -> bool:
         if self._sock is not None:
             return self._sock.closed
         return True
 
-    async def close(self):
+    async def close(self) -> None:
         if self._sock is not None:
             self._sock.close()
         if self._zap_task is not None:
