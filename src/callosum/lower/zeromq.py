@@ -9,7 +9,7 @@ from typing import (
 )
 
 import attr
-import zmq, zmq.asyncio
+import zmq, zmq.asyncio, zmq.utils.monitor
 
 from ..abc import RawHeaderBody
 from ..auth import Identity
@@ -160,7 +160,47 @@ class ZeroMQRPCConnection(AbstractConnection):
             ])
 
 
-class ZeroMQBaseBinder(AbstractBinder):
+class ZeroMQMonitorMixin:
+
+    addr: ZeroMQAddress
+
+    _monitor_sock: Optional[zmq.Socket]
+
+    EVENT_MAP = {
+        zmq.EVENT_MONITOR_STOPPED: "monitor-stopped",
+        zmq.EVENT_ACCEPT_FAILED: "accept-failed",
+        zmq.EVENT_ACCEPTED: "accepted",
+        zmq.EVENT_BIND_FAILED: "bind-failed",
+        zmq.EVENT_LISTENING: "listening",
+        zmq.EVENT_CLOSE_FAILED: "close-failed",
+        zmq.EVENT_CLOSED: "closed",
+        zmq.EVENT_CONNECTED: "connected",
+        zmq.EVENT_CONNECT_DELAYED: "connect-delayed",
+        zmq.EVENT_CONNECT_RETRIED: "connect-retried",
+        zmq.EVENT_DISCONNECTED: "disconnected",
+        zmq.EVENT_HANDSHAKE_FAILED_AUTH: "handshake-faield-auth",
+        zmq.EVENT_HANDSHAKE_FAILED_NO_DETAIL: "handshake-failed-no-detail",
+        zmq.EVENT_HANDSHAKE_FAILED_PROTOCOL: "handshake-failed-protocol",
+        zmq.EVENT_HANDSHAKE_SUCCEEDED: "handshake-succeeded",
+        zmq.EVENT_ALL: "all",
+    }
+
+    def _monitor(self) -> None:
+        assert self._monitor_sock is not None
+        log = logging.getLogger('callosum.lower.zeromq.monitor')
+        try:
+            while self._monitor_sock.poll():
+                msg = zmq.utils.monitor.recv_monitor_message(self._monitor_sock)
+                msg['description'] = self.EVENT_MAP.get(msg['event'], str(msg['event']))
+                log.debug("monitor[%s] event: %r", self.addr, msg)
+                if msg['event'] == zmq.EVENT_MONITOR_STOPPED:
+                    break
+        finally:
+            self._monitor_sock.close()
+            log.debug("monitor[%s] closed", self.addr)
+
+
+class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
 
     __slots__ = ('transport', 'addr')
 
@@ -169,9 +209,20 @@ class ZeroMQBaseBinder(AbstractBinder):
     transport: ZeroMQBaseTransport
     addr: ZeroMQAddress
 
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        *,
+        attach_monitor: bool = False,
+    ) -> None:
+        super().__init__(transport, addr)
+        self._attach_monitor = attach_monitor
+
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
+        loop = asyncio.get_running_loop()
         server_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             server_id = await self.transport.authenticator.server_identity()
@@ -180,15 +231,24 @@ class ZeroMQBaseBinder(AbstractBinder):
             server_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
         for key, value in self.transport._zsock_opts.items():
             server_sock.setsockopt(key, value)
+        if self._attach_monitor:
+            self._monitor_sock = server_sock.get_monitor_socket()
+            self._monitor_task = loop.run_in_executor(None, self._monitor)
+        else:
+            self._monitor_sock = None
+            self._monitor_task = None
         server_sock.bind(self.addr.uri)
         self.transport._sock = server_sock
+        self._main_sock = server_sock
         return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        pass
+        if self._monitor_task is not None:
+            self._main_sock.disable_monitor()
+            await self._monitor_task
 
 
-class ZeroMQBaseConnector(AbstractConnector):
+class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
 
     __slots__ = ('transport', 'addr')
 
@@ -197,9 +257,20 @@ class ZeroMQBaseConnector(AbstractConnector):
     transport: ZeroMQBaseTransport
     addr: ZeroMQAddress
 
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        *,
+        attach_monitor: bool = False,
+    ) -> None:
+        super().__init__(transport, addr)
+        self._attach_monitor = attach_monitor
+
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
+        loop = asyncio.get_running_loop()
         client_sock = self.transport._zctx.socket(type(self).socket_type)
         if self.transport.authenticator:
             auth = self.transport.authenticator
@@ -212,12 +283,21 @@ class ZeroMQBaseConnector(AbstractConnector):
             client_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
         for key, value in self.transport._zsock_opts.items():
             client_sock.setsockopt(key, value)
+        if self._attach_monitor:
+            self._monitor_sock = client_sock.get_monitor_socket()
+            self._monitor_task = loop.run_in_executor(None, self._monitor)
+        else:
+            self._monitor_sock = None
+            self._monitor_task = None
         client_sock.connect(self.addr.uri)
+        self._main_sock = client_sock
         self.transport._sock = client_sock
         return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        pass
+        if self._monitor_task is not None:
+            self._main_sock.disable_monitor()
+            await self._monitor_task
 
 
 class ZeroMQRouterBinder(ZeroMQBaseBinder):

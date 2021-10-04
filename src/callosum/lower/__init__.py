@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import abc
 from typing import (
-    AsyncGenerator, ClassVar,
-    Optional, Type,
+    Any,
+    AsyncGenerator,
+    ClassVar,
+    Mapping,
+    Optional,
+    Type,
 )
 
 from ..abc import RawHeaderBody
@@ -96,15 +100,21 @@ class BaseTransport(metaclass=abc.ABCMeta):
 
     authenticator: Optional[AbstractAuthenticator]
 
-    def __init__(self, authenticator: AbstractAuthenticator = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        authenticator: AbstractAuthenticator = None,
+        *,
+        transport_opts: Mapping[str, Any] = None,
+        **kwargs,
+    ) -> None:
         self.authenticator = authenticator
+        self.transport_opts = transport_opts
 
     def bind(self, bind_addr: AbstractAddress) -> AbstractBinder:
-        return type(self).binder_cls(self, bind_addr)
+        return type(self).binder_cls(self, bind_addr, **self.transport_opts)
 
     def connect(self, connect_addr: AbstractAddress) -> AbstractConnector:
-        return type(self).connector_cls(self, connect_addr)
+        return type(self).connector_cls(self, connect_addr, **self.transport_opts)
 
     async def close(self) -> None:
         '''
