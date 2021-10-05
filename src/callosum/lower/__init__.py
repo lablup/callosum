@@ -106,8 +106,10 @@ class BaseTransport(metaclass=abc.ABCMeta):
     binder_cls: ClassVar[Type[AbstractBinder]]
     connector_cls: ClassVar[Type[AbstractConnector]]
 
-    __slots__ = ('authenticator', )
-
+    __slots__ = (
+        'authenticator',
+        'transport_opts',
+    )
     authenticator: Optional[AbstractAuthenticator]
     transport_opts: Mapping[str, Any]
 
