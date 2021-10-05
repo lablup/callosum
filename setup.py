@@ -16,7 +16,7 @@ def read_src_version():
 install_requires = [
     'aiotools>=0.9.1',
     'async_timeout>=3.0.1',
-    'attrs>=19.3.0',
+    'attrs>=21.2.0',
     'python-dateutil>=2.8.1',
     'msgpack>=1.0.0',
     'temporenc>=0.1',
@@ -29,9 +29,9 @@ build_requires = [
 ]
 
 test_requires = [
-    'Click>=7.0',
-    'pytest~=5.4.1',
-    'pytest-asyncio>=0.11.0',
+    'Click>=8.0',
+    'pytest~=6.2',
+    'pytest-asyncio>=0.15.0',
     'pytest-cov',
     'pytest-mock',
     'codecov',
@@ -42,7 +42,7 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    'flake8>=3.8.1',
+    'flake8>=3.9',
 ]
 
 typecheck_requires = [
