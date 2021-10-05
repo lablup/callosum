@@ -64,7 +64,7 @@ zmq_requires = [
 ]
 
 redis_requires = [
-    'aioredis>=1.3.0',
+    'aioredis>=1.3.0,<2.0',
 ]
 
 snappy_requires = [
