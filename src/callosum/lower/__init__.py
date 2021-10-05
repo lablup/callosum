@@ -109,6 +109,7 @@ class BaseTransport(metaclass=abc.ABCMeta):
     __slots__ = ('authenticator', )
 
     authenticator: Optional[AbstractAuthenticator]
+    transport_opts: Mapping[str, Any]
 
     def __init__(
         self,

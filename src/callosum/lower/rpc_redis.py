@@ -190,15 +190,16 @@ class RPCRedisTransport(BaseTransport):
     binder_cls = RPCRedisBinder
     connector_cls = RPCRedisConnector
 
-    def __init__(self,
-                 authenticator,
-                 **kwargs):
-        transport_opts = kwargs.get('transport_opts', {})
-        self._redis_opts = transport_opts.get('redis_opts', {})
+    def __init__(
+        self,
+        authenticator,
+        **kwargs,
+    ) -> None:
         super().__init__(authenticator, **kwargs)
+        self._redis_opts = self.transport_opts.get('redis_opts', {})
         self._redis = None
 
-    async def close(self):
+    async def close(self) -> None:
         if self._redis is not None and not self._redis.closed:
             self._redis.close()
             await self._redis.wait_closed()
