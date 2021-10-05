@@ -4,11 +4,14 @@ import asyncio
 import logging
 from typing import (
     AsyncGenerator,
-    ClassVar, Type,
-    Optional, Tuple, Union,
+    ClassVar,
+    Optional,
+    Tuple,
+    Type,
+    Union,
 )
 import secrets
-import sys
+import warnings
 
 import attr
 import zmq, zmq.asyncio, zmq.utils.monitor
@@ -228,6 +231,11 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
     ) -> None:
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
+        if attach_monitor:
+            warnings.warn(
+                "ZeroMQ async monitor socket support is buggy and not recommended to use.",
+                RuntimeWarning,
+            )
 
     async def __aenter__(self):
         if not self.transport._closed:
@@ -241,15 +249,11 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         for key, value in self.transport._zsock_opts.items():
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
-            log = logging.getLogger('callosum.lower.zeromq.monitor')
-            try:
-                monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
-                server_sock.get_monitor_socket(addr=monitor_addr)
-                self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
-                self._monitor_sock.connect(monitor_addr)
-                self._monitor_task = asyncio.create_task(self._monitor())
-            except Exception:
-                log.exception("unexpected error while making monitor socket")
+            monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
+            server_sock.get_monitor_socket(addr=monitor_addr)
+            self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
+            self._monitor_sock.connect(monitor_addr)
+            self._monitor_task = asyncio.create_task(self._monitor())
         else:
             self._monitor_sock = None
             self._monitor_task = None
@@ -282,6 +286,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
     ) -> None:
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
+        if attach_monitor:
+            warnings.warn(
+                "ZeroMQ async monitor socket support is buggy and not recommended to use.",
+                RuntimeWarning,
+            )
 
     async def __aenter__(self):
         if not self.transport._closed:
@@ -299,15 +308,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         for key, value in self.transport._zsock_opts.items():
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
-            log = logging.getLogger('callosum.lower.zeromq.monitor')
-            try:
-                monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
-                client_sock.get_monitor_socket(addr=monitor_addr)
-                self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
-                self._monitor_sock.connect(monitor_addr)
-                self._monitor_task = asyncio.create_task(self._monitor())
-            except Exception:
-                log.exception("unexpected error while making monitor socket")
+            monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
+            client_sock.get_monitor_socket(addr=monitor_addr)
+            self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
+            self._monitor_sock.connect(monitor_addr)
+            self._monitor_task = asyncio.create_task(self._monitor())
         else:
             self._monitor_sock = None
             self._monitor_task = None
