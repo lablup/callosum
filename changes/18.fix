@@ -1,1 +1,0 @@
-Improve `zsock_opts` handling when explicitly specified by the library users, as previously it caused argument errors in binders and connectors

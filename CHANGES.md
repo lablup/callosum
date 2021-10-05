@@ -16,6 +16,23 @@ Changes
 
 .. towncrier release notes start
 
+v0.9.9 (2021-10-05)
+-------------------
+
+#### Fixes
+* Add explicit `task_done()` call to the output queue of `rpc.Peer` instances to avoid potential missing wakeup on joined coroutines ([#16](https://github.com/lablup/callosum/issues/16))
+
+
+v0.9.8 (2021-10-05)
+-------------------
+
+#### Features
+* lower.zeromq: Add a transport option to attach monitors for logging underlying socket events ([#17](https://github.com/lablup/callosum/issues/17))
+
+#### Fixes
+* Improve `zsock_opts` handling when explicitly specified by the library users, as previously it caused argument errors in binders and connectors ([#18](https://github.com/lablup/callosum/issues/18))
+
+
 v0.9.7 (2020-12-22)
 -------------------
 

@@ -1,1 +1,0 @@
-Add explicit `task_done()` call to the output queue of `rpc.Peer` instances to avoid potential missing wakeup on joined coroutines
