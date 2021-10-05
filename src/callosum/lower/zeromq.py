@@ -233,7 +233,8 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         self._attach_monitor = attach_monitor
         if attach_monitor:
             warnings.warn(
-                "ZeroMQ async monitor socket support is buggy and not recommended to use.",
+                "ZeroMQ async monitor socket support is buggy "
+                "and not recommended to use.",
                 RuntimeWarning,
             )
 
@@ -288,7 +289,8 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         self._attach_monitor = attach_monitor
         if attach_monitor:
             warnings.warn(
-                "ZeroMQ async monitor socket support is buggy and not recommended to use.",
+                "ZeroMQ async monitor socket support is buggy "
+                "and not recommended to use.",
                 RuntimeWarning,
             )
 
