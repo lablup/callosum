@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import (
+    Any,
     AsyncGenerator,
     ClassVar,
+    Mapping,
     Optional,
     Tuple,
     Type,
@@ -26,6 +28,10 @@ from . import (
 )
 
 ZAP_VERSION = b'1.0'
+
+_default_zsock_opts = {
+    zmq.LINGER: 100,
+}
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -215,7 +221,15 @@ class ZeroMQMonitorMixin:
 
 class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
 
-    __slots__ = ('transport', 'addr')
+    __slots__ = (
+        'transport',
+        'addr',
+        '_attach_monitor',
+        '_monitor_sock',
+        '_monitor_task',
+        '_main_sock',
+        '_zsock_opts',
+    )
 
     socket_type: ClassVar[int] = 0
 
@@ -228,9 +242,12 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         addr: AbstractAddress,
         *,
         attach_monitor: bool = False,
+        zsock_opts: Mapping[int, Any] = None,
+        **transport_opts,
     ) -> None:
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
+        self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
         if attach_monitor:
             warnings.warn(
                 "ZeroMQ async monitor socket support is buggy "
@@ -247,7 +264,7 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
             server_sock.zap_domain = server_id.domain.encode('utf8')
             server_sock.setsockopt(zmq.CURVE_SERVER, 1)
             server_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
-        for key, value in self.transport._zsock_opts.items():
+        for key, value in self._zsock_opts.items():
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
             monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
@@ -271,7 +288,15 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
 
 class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
 
-    __slots__ = ('transport', 'addr')
+    __slots__ = (
+        'transport',
+        'addr',
+        '_attach_monitor',
+        '_monitor_sock',
+        '_monitor_task',
+        '_main_sock',
+        '_zsock_opts',
+    )
 
     socket_type: ClassVar[int] = 0
 
@@ -284,9 +309,12 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         addr: AbstractAddress,
         *,
         attach_monitor: bool = False,
+        zsock_opts: Mapping[int, Any] = None,
+        **transport_opts,
     ) -> None:
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
+        self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
         if attach_monitor:
             warnings.warn(
                 "ZeroMQ async monitor socket support is buggy "
@@ -307,7 +335,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
             client_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             client_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
             client_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
-        for key, value in self.transport._zsock_opts.items():
+        for key, value in self._zsock_opts.items():
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
             monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
@@ -389,10 +417,6 @@ class ZeroMQBaseTransport(BaseTransport):
         loop = asyncio.get_running_loop()
         self._zap_server = None
         self._zap_task = None
-        self._zsock_opts = {
-            zmq.LINGER: 100,
-            **self.transport_opts.get('zsock_opts', {}),
-        }
         if self.authenticator:
             self._zap_server = ZAPServer(self.authenticator)
             self._zap_task = loop.create_task(self._zap_server.serve())
