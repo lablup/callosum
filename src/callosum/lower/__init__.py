@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import abc
 from typing import (
-    AsyncGenerator, ClassVar,
-    Optional, Type,
+    Any,
+    AsyncGenerator,
+    ClassVar,
+    Mapping,
+    Optional,
+    Type,
 )
 
 from ..abc import RawHeaderBody
@@ -45,7 +49,12 @@ class AbstractBinder(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        **transport_opts,
+    ) -> None:
         self.transport = transport
         self.addr = addr
 
@@ -68,7 +77,12 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     __slots__ = ('transport', 'addr')
 
-    def __init__(self, transport: BaseTransport, addr: AbstractAddress):
+    def __init__(
+        self,
+        transport: BaseTransport,
+        addr: AbstractAddress,
+        **transport_opts,
+    ) -> None:
         self.transport = transport
         self.addr = addr
 
@@ -92,19 +106,28 @@ class BaseTransport(metaclass=abc.ABCMeta):
     binder_cls: ClassVar[Type[AbstractBinder]]
     connector_cls: ClassVar[Type[AbstractConnector]]
 
-    __slots__ = ('authenticator', )
-
+    __slots__ = (
+        'authenticator',
+        'transport_opts',
+    )
     authenticator: Optional[AbstractAuthenticator]
+    transport_opts: Mapping[str, Any]
 
-    def __init__(self, authenticator: AbstractAuthenticator = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        authenticator: AbstractAuthenticator = None,
+        *,
+        transport_opts: Mapping[str, Any] = None,
+        **kwargs,
+    ) -> None:
         self.authenticator = authenticator
+        self.transport_opts = transport_opts or {}
 
     def bind(self, bind_addr: AbstractAddress) -> AbstractBinder:
-        return type(self).binder_cls(self, bind_addr)
+        return type(self).binder_cls(self, bind_addr, **self.transport_opts)
 
     def connect(self, connect_addr: AbstractAddress) -> AbstractConnector:
-        return type(self).connector_cls(self, connect_addr)
+        return type(self).connector_cls(self, connect_addr, **self.transport_opts)
 
     async def close(self) -> None:
         '''

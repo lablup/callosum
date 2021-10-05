@@ -77,7 +77,7 @@ class Peer(AbstractChannel):
         bind: AbstractAddress = None,
         transport: Type[BaseTransport] = None,
         authenticator: AbstractAuthenticator = None,
-        transport_opts: Mapping[str, Any] = {},
+        transport_opts: Mapping[str, Any] = None,
         scheduler: AbstractAsyncScheduler = None,
         compress: bool = True,
         max_body_size: int = 10 * (2**20),  # 10 MiBytes
@@ -102,8 +102,10 @@ class Peer(AbstractChannel):
         self._scheduler = None
         if transport is None:
             raise ValueError('You must provide a transport class.')
-        self._transport = transport(authenticator=authenticator,
-                                    transport_opts=transport_opts)
+        self._transport = transport(
+            authenticator=authenticator,
+            transport_opts=transport_opts or {},
+        )
         self._func_registry = {}
 
         self._client_seq_id = 0
