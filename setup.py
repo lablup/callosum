@@ -56,7 +56,7 @@ docs_requires = [
 ]
 
 thrift_requires = [
-    'thriftpy2>=0.4.9',
+    'thriftpy2>=0.4.14',
 ]
 
 zmq_requires = [
@@ -64,7 +64,7 @@ zmq_requires = [
 ]
 
 redis_requires = [
-    'aioredis>=1.3.0,<2.0',
+    'aioredis~=2.0',
 ]
 
 snappy_requires = [
