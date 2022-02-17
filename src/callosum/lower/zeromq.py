@@ -180,22 +180,9 @@ class ZeroMQMonitorMixin:
     _monitor_sock: Optional[zmq.Socket]
 
     EVENT_MAP = {
-        zmq.EVENT_MONITOR_STOPPED: "monitor-stopped",
-        zmq.EVENT_ACCEPT_FAILED: "accept-failed",
-        zmq.EVENT_ACCEPTED: "accepted",
-        zmq.EVENT_BIND_FAILED: "bind-failed",
-        zmq.EVENT_LISTENING: "listening",
-        zmq.EVENT_CLOSE_FAILED: "close-failed",
-        zmq.EVENT_CLOSED: "closed",
-        zmq.EVENT_CONNECTED: "connected",
-        zmq.EVENT_CONNECT_DELAYED: "connect-delayed",
-        zmq.EVENT_CONNECT_RETRIED: "connect-retried",
-        zmq.EVENT_DISCONNECTED: "disconnected",
-        zmq.EVENT_HANDSHAKE_FAILED_AUTH: "handshake-faield-auth",
-        zmq.EVENT_HANDSHAKE_FAILED_NO_DETAIL: "handshake-failed-no-detail",
-        zmq.EVENT_HANDSHAKE_FAILED_PROTOCOL: "handshake-failed-protocol",
-        zmq.EVENT_HANDSHAKE_SUCCEEDED: "handshake-succeeded",
-        zmq.EVENT_ALL: "all",
+        getattr(zmq.constants, name): name[6:].replace("_", "-").lower()
+        for name in dir(zmq.constants)
+        if name.startswith("EVENT_")
     }
 
     async def _monitor(self) -> None:
