@@ -5,7 +5,7 @@ directory = "changes/"
 title_format = "v{version} ({project_date})"
 template = "changes/template.md"
 issue_format = "([#{issue}](https://github.com/lablup/callosum/issues/{issue}))"
-underlines = ["-", "", ""]
+underlines = ["", "", ""]
 
 [[tool.towncrier.type]]
     directory = "breaking"
