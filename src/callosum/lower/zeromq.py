@@ -179,6 +179,8 @@ class ZeroMQMonitorMixin:
 
     _monitor_sock: Optional[zmq.Socket]
 
+    # FIXME: Upon release pyzmq 23.0 or 22.4, take the constant declarations
+    #        from the zmq.constants.Event enum class, instead of doing dir().
     EVENT_MAP = {
         getattr(zmq.constants, name): name[6:].replace("_", "-").lower()
         for name in dir(zmq.constants)
