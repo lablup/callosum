@@ -101,8 +101,12 @@ ENV/
 .mypy_cache/
 
 # editor/IDE
+.swp
 .*.swp
 .idea/
 
 # PyTest stuff:
 .pytest_cache/
+
+# etc
+.DS_Store
