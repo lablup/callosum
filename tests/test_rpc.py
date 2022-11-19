@@ -92,7 +92,7 @@ async def dummy_client(
 )
 async def test_messaging(scheduler_cls) -> None:
     done = asyncio.Event()
-    total = 200
+    total = 50
     call_results: List[int] = []
     return_results: List[int] = []
     # a list of events to make fucntions to return in the reversed order
