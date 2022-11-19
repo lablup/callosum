@@ -15,26 +15,27 @@ async def handle_echo(request):
     time.sleep(1.0)
     print("After sleeping")
     return {
-        'received': request.body['sent'],
+        "received": request.body["sent"],
     }
 
 
 async def handle_add(request):
     return {
-        'result': request.body['a'] + request.body['b'],
+        "result": request.body["a"] + request.body["b"],
     }
 
 
 async def serve() -> None:
     peer = Peer(
         bind=RedisStreamAddress(
-            'redis://localhost:6379',
-            'myservice', 'server-group', 'client1'),
+            "redis://127.0.0.1:6379", "myservice", "server-group", "client1"
+        ),
         transport=RPCRedisTransport,
-        serializer=lambda o: json.dumps(o).encode('utf8'),
-        deserializer=lambda b: json.loads(b))
-    peer.handle_function('echo', handle_echo)
-    peer.handle_function('add', handle_add)
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    peer.handle_function("echo", handle_echo)
+    peer.handle_function("add", handle_add)
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()
@@ -42,12 +43,12 @@ async def serve() -> None:
     loop.add_signal_handler(signal.SIGTERM, forever.cancel)
     async with peer:
         try:
-            print('server started')
+            print("server started")
             await forever
         except asyncio.CancelledError:
             pass
-    print('server terminated')
+    print("server terminated")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(serve())

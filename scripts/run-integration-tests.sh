@@ -2,6 +2,7 @@
 cd examples
 
 set -e
+export TERM=${TERM:-linux}
 
 do_test() {
   echo "$(tput bold)Testing pairs: $(tput setaf 3)$1$(tput setaf 4) <==> $(tput setaf 3)$2$(tput sgr0)"
