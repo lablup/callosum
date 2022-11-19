@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import random
 import secrets
 
@@ -11,9 +12,14 @@ from callosum.lower.rpc_redis import (
 
 
 async def call():
+    redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
+    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
     peer = Peer(
         connect=RedisStreamAddress(
-            "redis://127.0.0.1:6379", "myservice", "client-group", "server1"
+            f"redis://{redis_host}:{redis_port}",
+            "myservice",
+            "client-group",
+            "server1",
         ),
         transport=RPCRedisTransport,
         serializer=json.dumps,

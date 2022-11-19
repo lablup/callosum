@@ -132,6 +132,9 @@ jobs:
         python -m pip install -U pip setuptools wheel
         python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
     - name: Run unit tests
+      env:
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
       run: |
         python -m pytest --cov tests
     - name: Upload coverage report
@@ -165,6 +168,9 @@ jobs:
         python -m pip install -U pip setuptools wheel
         python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
     - name: Run integration tests
+      env:
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
       run: |
         ./scripts/run-integration-tests.sh
 

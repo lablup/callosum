@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import signal
 import time
 
@@ -26,9 +27,14 @@ async def handle_add(request):
 
 
 async def serve() -> None:
+    redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
+    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
     peer = Peer(
         bind=RedisStreamAddress(
-            "redis://127.0.0.1:6379", "myservice", "server-group", "client1"
+            f"redis://{redis_host}:{redis_port}",
+            "myservice",
+            "server-group",
+            "client1",
         ),
         transport=RPCRedisTransport,
         serializer=lambda o: json.dumps(o).encode("utf8"),

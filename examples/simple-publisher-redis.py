@@ -1,10 +1,11 @@
-'''
+"""
 During the testing, you can launch multiple publishers
 simultaneously, so as to check whether messages from
 multiple publishers are distributed among the consumers.
-'''
+"""
 import asyncio
 import json
+import os
 import random
 import secrets
 
@@ -18,20 +19,21 @@ from callosum.lower.dispatch_redis import (
 
 
 async def publish() -> None:
+    redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
+    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
     pub = Publisher(
-        bind=RedisStreamAddress(
-            'redis://localhost:6379',
-            'events'),
-        serializer=lambda d: json.dumps(d).encode('utf8'),
-        transport=DispatchRedisTransport)
+        bind=RedisStreamAddress(f"redis://{redis_host}:{redis_port}", "events"),
+        serializer=lambda d: json.dumps(d).encode("utf8"),
+        transport=DispatchRedisTransport,
+    )
     agent_id = secrets.token_hex(2)  # publisher id
 
     async def heartbeats():
         for _ in range(3):
             await asyncio.sleep(1)
             msg_body = {
-                'type': "instance_heartbeat",
-                'agent_id': agent_id,
+                "type": "instance_heartbeat",
+                "agent_id": agent_id,
             }
             pub.push(msg_body)
             print("pushed heartbeat")
@@ -39,8 +41,8 @@ async def publish() -> None:
     async def addition_event(addend1: int, addend2: int):
         await asyncio.sleep(1.5)
         msg_body = {
-            'type': "number_addition",
-            'addends': (addend1, addend2),
+            "type": "number_addition",
+            "addends": (addend1, addend2),
         }
         pub.push(msg_body)
         print("pushed addition event")
@@ -51,8 +53,8 @@ async def publish() -> None:
         addend2 = random.randint(10, 20)
         task2 = asyncio.create_task(addition_event(addend1, addend2))
         await asyncio.gather(task1, task2)
-    print('publisher done')
+    print("publisher done")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(publish())
