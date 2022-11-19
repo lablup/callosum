@@ -10,7 +10,8 @@ root = Path(__file__).parent
 def read_src_version():
     p = root / "src" / "callosum" / "__init__.py"
     src = p.read_text()
-    m = re.search(r"^__version__\s*=\s*'([^']+)'", src, re.M)
+    m = re.search(r'^__version__\s*=\s*"([^"]+)"', src, re.M)
+    assert m is not None
     return m.group(1)
 
 
