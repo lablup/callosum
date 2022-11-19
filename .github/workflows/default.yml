@@ -107,6 +107,14 @@ jobs:
   test-unit:
 
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 4s
+          --health-timeout 2s
+          --health-retries 5
 
     steps:
     - name: Checkout
@@ -132,6 +140,14 @@ jobs:
   test-integration:
 
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 4s
+          --health-timeout 2s
+          --health-retries 5
 
     steps:
     - name: Checkout
