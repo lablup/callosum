@@ -14,27 +14,27 @@ def read_src_version():
 
 
 install_requires = [
-    'aiotools>=0.9.1',
+    'aiotools>=1.5.9',
     'async_timeout>=3.0.1',
-    'attrs>=21.2.0',
-    'python-dateutil>=2.8.1',
-    'msgpack>=1.0.0',
+    'attrs>=21.3.0',
+    'python-dateutil>=2.8.2',
+    'msgpack>=1.0.4',
     'temporenc>=0.1',
 ]
 
 build_requires = [
-    'wheel>=0.33.6',
-    'twine>=3.1.0',
-    'towncrier>=19.2.0',
+    'wheel>=0.38.4',
+    'twine>=4.0.1',
+    'towncrier>=22.8.0',
 ]
 
 test_requires = [
     'Click>=8.0',
-    'pytest~=6.2',
-    'pytest-asyncio>=0.15.0',
-    'pytest-cov',
-    'pytest-mock',
-    'codecov',
+    'pytest~=7.2',
+    'pytest-asyncio>=0.20.2',
+    'pytest-cov>=4.0',
+    'pytest-mock>=3.10.0',
+    'codecov>=2.1',
 ]
 
 dev_requires: List[str] = [
@@ -42,11 +42,11 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    'flake8>=3.9',
+    'flake8>=5.0.4',
 ]
 
 typecheck_requires = [
-    'mypy>=0.910',
+    'mypy>=0.991',
     'types-python-dateutil',
 ]
 
@@ -60,7 +60,7 @@ thrift_requires = [
 ]
 
 zmq_requires = [
-    'pyzmq>=19.0.0',
+    'pyzmq>=23.0.0',
 ]
 
 redis_requires = [
@@ -68,7 +68,7 @@ redis_requires = [
 ]
 
 snappy_requires = [
-    'python-snappy>=0.5.4',
+    'python-snappy>=0.6.1',
 ]
 
 setup(
@@ -92,6 +92,8 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
         'Topic :: Communications',
@@ -106,7 +108,7 @@ setup(
     },
     include_package_data=True,
     python_requires='>=3.8',
-    setup_requires=['setuptools>=45.2.0'],
+    setup_requires=['setuptools>=61.0'],
     install_requires=install_requires,
     extras_require={
         'build': build_requires,
