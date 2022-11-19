@@ -47,13 +47,17 @@ class ZAPServer:
     A simple authenticator adaptor that implements ZAP protocol.
     """
 
-    def __init__(self, zctx, authenticator=None):
+    _log: logging.Logger
+    _zap_socket: Optional[zmq.asyncio.Socket]
+    _zctx: zmq.asyncio.Context
+
+    def __init__(self, zctx: zmq.asyncio.Context, authenticator=None) -> None:
         self._log = logging.getLogger(__name__ + ".ZAPServer")
         self._authenticator = authenticator
         self._zap_socket = None
         self._zctx = zctx
 
-    async def serve(self):
+    async def serve(self) -> None:
         self._zap_socket = self._zctx.socket(zmq.REP)
         self._zap_socket.linger = 1
         self._zap_socket.bind("inproc://zeromq.zap.01")
@@ -67,12 +71,12 @@ class ZAPServer:
             self._zap_socket.close()
             self._zap_socket = None
 
-    def close(self):
+    def close(self) -> None:
         if self._zap_socket is not None:
             self._zap_socket.close()
         self._zap_socket = None
 
-    async def handle_zap_message(self, msg):
+    async def handle_zap_message(self, msg) -> None:
         if len(msg) < 6:
             self._log.error("Invalid ZAP message, not enough frames: %r", msg)
             if len(msg) < 2:
@@ -91,7 +95,7 @@ class ZAPServer:
             await self._send_zap_reply(request_id, b"400", b"Invalid version")
             return
 
-        self.log.debug(
+        self._log.debug(
             "version: %r, request_id: %r, domain: %r, "
             "address: %r, sock_identity: %r, mechanism: %r",
             version,
@@ -140,7 +144,7 @@ class ZAPServer:
         status_code: bytes,
         status_text: bytes,
         user_id: str = "",
-    ):
+    ) -> None:
         metadata = b""
         self._log.debug("ZAP reply code=%s text=%s", status_code, status_text)
         reply = (
@@ -151,6 +155,7 @@ class ZAPServer:
             user_id.encode("utf8", "replace"),
             metadata,
         )
+        assert self._zap_socket is not None
         await self._zap_socket.send_multipart(reply)
 
 
@@ -202,7 +207,7 @@ class ZeroMQMonitorMixin:
 
     addr: ZeroMQAddress
 
-    _monitor_sock: Optional[zmq.Socket]
+    _monitor_sock: Optional[zmq.asyncio.Socket]
 
     # FIXME: Upon release pyzmq 23.0 or 22.4, take the constant declarations
     #        from the zmq.constants.Event enum class, instead of doing dir().
@@ -219,10 +224,6 @@ class ZeroMQMonitorMixin:
             while await self._monitor_sock.poll():
                 raw_msg = await self._monitor_sock.recv_multipart()
                 msg = zmq.utils.monitor.parse_monitor_message(raw_msg)
-                msg["description"] = self.EVENT_MAP.get(
-                    msg["event"],
-                    str(msg["event"]),
-                )
                 log.debug("monitor[%s] event: %r", self.addr, msg)
                 if msg["event"] == zmq.EVENT_MONITOR_STOPPED:
                     break
@@ -433,10 +434,10 @@ class ZeroMQBaseTransport(BaseTransport):
         loop = asyncio.get_running_loop()
         self._zap_server = None
         self._zap_task = None
-        if self.authenticator:
-            self._zap_server = ZAPServer(self.authenticator)
-            self._zap_task = loop.create_task(self._zap_server.serve())
         self._zctx = zmq.asyncio.Context()
+        if self.authenticator:
+            self._zap_server = ZAPServer(self._zctx, self.authenticator)
+            self._zap_task = loop.create_task(self._zap_server.serve())
         # Keep sockets during the transport lifetime.
         self._sock = None
 
