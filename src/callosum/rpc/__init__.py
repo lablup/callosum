@@ -1,8 +1,8 @@
 from typing import Any, Protocol
 
-from .exceptions import RPCError, RPCUserError, RPCInternalError
-from .message import RPCMessage
 from .channel import Peer
+from .exceptions import RPCError, RPCInternalError, RPCUserError
+from .message import RPCMessage
 
 
 class FunctionHandler(Protocol):
@@ -11,10 +11,10 @@ class FunctionHandler(Protocol):
 
 
 __all__ = (
-    'RPCError',
-    'RPCUserError',
-    'RPCInternalError',
-    'RPCMessage',
-    'Peer',
-    'FunctionHandler',
+    "RPCError",
+    "RPCUserError",
+    "RPCInternalError",
+    "RPCMessage",
+    "Peer",
+    "FunctionHandler",
 )

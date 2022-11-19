@@ -4,40 +4,47 @@ import asyncio
 import functools
 import logging
 from typing import (
-    Any, Optional, Type, Union,
-    Mapping, MutableMapping,
-    Tuple, Set, Dict,
     TYPE_CHECKING,
+    Any,
+    Dict,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
 )
 
+import attrs
 from aiotools import aclosing
 from async_timeout import timeout
-import attrs
 
 from ..abc import (
+    AbstractChannel,
+    AbstractDeserializer,
+    AbstractSerializer,
     QueueSentinel,
     TaskSentinel,
-    AbstractChannel,
-    AbstractDeserializer, AbstractSerializer,
 )
 from ..auth import AbstractAuthenticator
-from .exceptions import RPCUserError, RPCInternalError
-from ..ordering import (
-    AsyncResolver, AbstractAsyncScheduler,
-    ExitOrderedAsyncScheduler, SEQ_BITS,
-)
 from ..lower import (
     AbstractAddress,
+    AbstractBinder,
     AbstractConnection,
-    AbstractBinder, AbstractConnector,
+    AbstractConnector,
     BaseTransport,
 )
-from .message import (
-    RPCMessage, RPCMessageTypes,
+from ..ordering import (
+    SEQ_BITS,
+    AbstractAsyncScheduler,
+    AsyncResolver,
+    ExitOrderedAsyncScheduler,
 )
-from .types import (
-    RequestId,
-)
+from .exceptions import RPCInternalError, RPCUserError
+from .message import RPCMessage, RPCMessageTypes
+from .types import RequestId
+
 if TYPE_CHECKING:
     from . import FunctionHandler
 
@@ -45,14 +52,14 @@ log = logging.getLogger(__name__)
 
 
 class Peer(AbstractChannel):
-    '''
+    """
     Represents a bidirectional connection where both sides can invoke each
     other.
 
     In Callosum, there is no fixed server or client for a connection.
     Once the connection is established, each peer can become both
     RPC client and RPC server.
-    '''
+    """
 
     _connection: Optional[AbstractConnection]
     _deserializer: AbstractDeserializer
@@ -70,7 +77,8 @@ class Peer(AbstractChannel):
     _debug_rpc: bool
 
     def __init__(
-        self, *,
+        self,
+        *,
         deserializer: AbstractDeserializer,
         serializer: AbstractSerializer,
         connect: Optional[AbstractAddress] = None,
@@ -87,7 +95,7 @@ class Peer(AbstractChannel):
         debug_rpc: bool = False,
     ) -> None:
         if connect is None and bind is None:
-            raise ValueError('You must specify either the connect or bind address.')
+            raise ValueError("You must specify either the connect or bind address.")
         self._connect = connect
         self._bind = bind
         self._opener = None
@@ -101,7 +109,7 @@ class Peer(AbstractChannel):
 
         self._scheduler = None
         if transport is None:
-            raise ValueError('You must provide a transport class.')
+            raise ValueError("You must provide a transport class.")
         self._transport = transport(
             authenticator=authenticator,
             transport_opts=transport_opts or {},
@@ -123,7 +131,7 @@ class Peer(AbstractChannel):
         self._recv_task = None
         self._send_task = None
 
-        self._log = logging.getLogger(__name__ + '.Peer')
+        self._log = logging.getLogger(__name__ + ".Peer")
         self._debug_rpc = debug_rpc
 
     def handle_function(self, method: str, handler: FunctionHandler) -> None:
@@ -136,11 +144,11 @@ class Peer(AbstractChannel):
         return self._func_registry[method]
 
     async def _recv_loop(self) -> None:
-        '''
+        """
         Receive requests and schedule the request handlers.
-        '''
+        """
         if self._connection is None:
-            raise RuntimeError('consumer is not opened yet.')
+            raise RuntimeError("consumer is not opened yet.")
         func_tasks: Set[asyncio.Task] = set()
         while True:
             try:
@@ -159,14 +167,17 @@ class Peer(AbstractChannel):
                                 client_request_id[1],
                                 server_seq_id,
                             )
-                            self._req_idmap[(request.peer_id, client_request_id)] = \
-                                server_request_id
+                            self._req_idmap[
+                                (request.peer_id, client_request_id)
+                            ] = server_request_id
                             func_handler = self._lookup_func(request.method)
-                            task = asyncio.create_task(self._func_task(
-                                server_request_id,
-                                request,
-                                func_handler,
-                            ))
+                            task = asyncio.create_task(
+                                self._func_task(
+                                    server_request_id,
+                                    request,
+                                    func_handler,
+                                )
+                            )
                             func_tasks.add(task)
                             task.add_done_callback(func_tasks.discard)
                             task.add_done_callback(
@@ -184,10 +195,12 @@ class Peer(AbstractChannel):
                             if server_request_id is None:
                                 continue
                             await self._func_scheduler.cancel(server_request_id)
-                        elif request.msgtype in (RPCMessageTypes.RESULT,
-                                                 RPCMessageTypes.FAILURE,
-                                                 RPCMessageTypes.CANCELLED,
-                                                 RPCMessageTypes.ERROR):
+                        elif request.msgtype in (
+                            RPCMessageTypes.RESULT,
+                            RPCMessageTypes.FAILURE,
+                            RPCMessageTypes.CANCELLED,
+                            RPCMessageTypes.ERROR,
+                        ):
                             self._invocation_resolver.resolve(
                                 client_request_id,
                                 request,
@@ -204,39 +217,36 @@ class Peer(AbstractChannel):
                 await asyncio.sleep(0)
                 break
             except Exception:
-                log.exception('unexpected error')
+                log.exception("unexpected error")
 
     async def _send_loop(self) -> None:
-        '''
+        """
         Fetches and sends out the completed task responses.
-        '''
+        """
         if self._connection is None:
-            raise RuntimeError('consumer is not opened yet.')
+            raise RuntimeError("consumer is not opened yet.")
         while True:
             try:
                 msg = await self._outgoing_queue.get()
                 try:
                     if msg is QueueSentinel.CLOSED:
                         break
-                    await self._connection.send_message(
-                        msg.encode(self._serializer))
+                    await self._connection.send_message(msg.encode(self._serializer))
                 finally:
                     self._outgoing_queue.task_done()
             except asyncio.CancelledError:
                 break
             except Exception:
-                log.exception('unexpected error')
+                log.exception("unexpected error")
 
     async def __aenter__(self) -> Peer:
         _opener: Union[AbstractBinder, AbstractConnector]
         if self._connect:
-            _opener = functools.partial(self._transport.connect,
-                                        self._connect)()
+            _opener = functools.partial(self._transport.connect, self._connect)()
         elif self._bind:
-            _opener = functools.partial(self._transport.bind,
-                                        self._bind)()
+            _opener = functools.partial(self._transport.bind, self._bind)()
         else:
-            raise RuntimeError('Misconfigured opener')
+            raise RuntimeError("Misconfigured opener")
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         # NOTE: if we change the order of the following 2 lines of code,
@@ -262,21 +272,22 @@ class Peer(AbstractChannel):
 
     def _next_client_seq_id(self) -> int:
         current = self._client_seq_id
-        self._client_seq_id = (self._client_seq_id + 1) % (2 ** SEQ_BITS)
+        self._client_seq_id = (self._client_seq_id + 1) % (2**SEQ_BITS)
         return current
 
     def _next_server_seq_id(self) -> int:
         current = self._server_seq_id
-        self._server_seq_id = (self._server_seq_id + 1) % (2 ** SEQ_BITS)
+        self._server_seq_id = (self._server_seq_id + 1) % (2**SEQ_BITS)
         return current
 
-    async def _func_task(self, server_request_id: Tuple[str, str, int],
-                         request: RPCMessage,
-                         handler: FunctionHandler) -> None:
+    async def _func_task(
+        self,
+        server_request_id: Tuple[str, str, int],
+        request: RPCMessage,
+        handler: FunctionHandler,
+    ) -> None:
         try:
-            await self._func_scheduler.schedule(
-                server_request_id,
-                handler(request))
+            await self._func_scheduler.schedule(server_request_id, handler(request))
             try:
                 result = await self._func_scheduler.get_fut(server_request_id)
                 if result is TaskSentinel.CANCELLED:
@@ -286,7 +297,7 @@ class Peer(AbstractChannel):
             except Exception:
                 # exception from user handler => failure
                 if self._debug_rpc:
-                    self._log.exception('RPC user error')
+                    self._log.exception("RPC user error")
                 response = RPCMessage.failure(request)
             else:
                 response = RPCMessage.result(request, result)
@@ -295,22 +306,23 @@ class Peer(AbstractChannel):
             raise
         except Exception:
             if self._debug_rpc:
-                self._log.exception('RPC internal error')
+                self._log.exception("RPC internal error")
             # exception from our parts => error
             response = RPCMessage.error(request)
         finally:
             self._func_scheduler.cleanup(server_request_id)
             await self._outgoing_queue.put(response)
 
-    async def invoke(self, method: str, body, *,
-                     order_key=None, invoke_timeout=None):
-        '''
+    async def invoke(
+        self, method: str, body, *, order_key=None, invoke_timeout=None
+    ):
+        """
         Invoke a remote function via the transport connection.
-        '''
+        """
         if invoke_timeout is None:
             invoke_timeout = self._invoke_timeout
         if order_key is None:
-            order_key = b''
+            order_key = b""
         client_seq_id = self._next_client_seq_id()
         try:
             request: RPCMessage
@@ -330,7 +342,8 @@ class Peer(AbstractChannel):
                         )
                         await self._outgoing_queue.put(request)
                         response = await self._invocation_resolver.wait(
-                            request.request_id)
+                            request.request_id
+                        )
                         upper_result = await agen.asend(response.body)
                         try:
                             await agen.asend(None)
@@ -348,7 +361,8 @@ class Peer(AbstractChannel):
                     )
                     await self._outgoing_queue.put(request)
                     response = await self._invocation_resolver.wait(
-                        request.request_id)
+                        request.request_id
+                    )
                     upper_result = response.body
             if response.msgtype == RPCMessageTypes.RESULT:
                 pass

@@ -36,3 +36,12 @@ underlines = ["", "", ""]
     directory = "misc"
     name = "Miscellaneous"
     showcontent = true
+
+[tool.black]
+line-length = 85
+
+[tool.isort]
+profile = "black"
+line_length = 85
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+known_first_party = ["callosum"]

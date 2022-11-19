@@ -3,28 +3,22 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from typing import (
-    Any,
-    List,
-    Mapping,
-    Optional,
-    Type,
-    Union,
-)
+from typing import Any, List, Mapping, Optional, Type, Union
 
 from aiotools import aclosing
 
 from ..abc import (
-    QueueSentinel,
     AbstractChannel,
-    AbstractDeserializer, AbstractSerializer,
+    AbstractDeserializer,
+    AbstractSerializer,
+    QueueSentinel,
 )
 from ..auth import AbstractAuthenticator
 from ..lower import (
     AbstractAddress,
     AbstractBinder,
-    AbstractConnector,
     AbstractConnection,
+    AbstractConnector,
     BaseTransport,
 )
 from .message import StreamMessage
@@ -34,9 +28,9 @@ log = logging.getLogger(__name__)
 
 
 class Publisher(AbstractChannel):
-    '''
+    """
     Represents a unidirectional message publisher.
-    '''
+    """
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractBinder]
@@ -45,7 +39,8 @@ class Publisher(AbstractChannel):
     _serializer: AbstractSerializer
 
     def __init__(
-        self, *,
+        self,
+        *,
         serializer: AbstractSerializer,
         bind: Optional[AbstractAddress] = None,
         transport: Optional[Type[BaseTransport]] = None,
@@ -53,39 +48,38 @@ class Publisher(AbstractChannel):
         transport_opts: Mapping[str, Any] = {},
     ) -> None:
         if bind is None:
-            raise ValueError('You must specify the bind address.')
+            raise ValueError("You must specify the bind address.")
         self._bind = bind
         self._opener = None
         self._connection = None
         self._serializer = serializer
         if transport is None:
-            raise ValueError('You must provide a transport class.')
-        self._transport = transport(authenticator=authenticator,
-                                    transport_opts=transport_opts)
+            raise ValueError("You must provide a transport class.")
+        self._transport = transport(
+            authenticator=authenticator, transport_opts=transport_opts
+        )
 
         self._outgoing_queue = asyncio.Queue()
         self._send_task = None
 
-        self._log = logging.getLogger(__name__ + '.Publisher')
+        self._log = logging.getLogger(__name__ + ".Publisher")
 
     async def _send_loop(self) -> None:
         if self._connection is None:
-            raise RuntimeError('consumer is not opened yet.')
+            raise RuntimeError("consumer is not opened yet.")
         while True:
             try:
                 msg = await self._outgoing_queue.get()
                 if msg is QueueSentinel.CLOSED:
                     break
-                await self._connection.send_message(
-                    msg.encode(self._serializer))
+                await self._connection.send_message(msg.encode(self._serializer))
             except asyncio.CancelledError:
                 break
             except Exception:
-                log.exception('unexpected error')
+                log.exception("unexpected error")
 
     async def __aenter__(self) -> Publisher:
-        _opener = functools.partial(self._transport.bind,
-                                    self._bind)()
+        _opener = functools.partial(self._transport.bind, self._bind)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._send_task = asyncio.create_task(self._send_loop())
@@ -106,9 +100,9 @@ class Publisher(AbstractChannel):
 
 
 class Consumer(AbstractChannel):
-    '''
+    """
     Represents a unidirectional message consumer.
-    '''
+    """
 
     _connection: Optional[AbstractConnection]
     _opener: Optional[AbstractConnector]
@@ -118,7 +112,8 @@ class Consumer(AbstractChannel):
     _handler_registry: List[ConsumerCallback]
 
     def __init__(
-        self, *,
+        self,
+        *,
         deserializer: AbstractDeserializer,
         connect: Optional[AbstractAddress] = None,
         transport: Optional[Type[BaseTransport]] = None,
@@ -128,15 +123,16 @@ class Consumer(AbstractChannel):
         max_concurrency: int = 100,
     ) -> None:
         if connect is None:
-            raise ValueError('You must specify the connect address.')
+            raise ValueError("You must specify the connect address.")
         self._connect = connect
         self._opener = None
         self._connection = None
         self._deserializer = deserializer
         if transport is None:
-            raise ValueError('You must provide a transport class.')
-        self._transport = transport(authenticator=authenticator,
-                                    transport_opts=transport_opts)
+            raise ValueError("You must provide a transport class.")
+        self._transport = transport(
+            authenticator=authenticator, transport_opts=transport_opts
+        )
         self._scheduler = scheduler
         self._concurrency_sema = asyncio.Semaphore(max_concurrency)
 
@@ -144,7 +140,7 @@ class Consumer(AbstractChannel):
         self._handler_registry = []
         self._recv_task = None
 
-        self._log = logging.getLogger(__name__ + '.Consumer')
+        self._log = logging.getLogger(__name__ + ".Consumer")
 
     def add_handler(self, callback: ConsumerCallback) -> None:
         self._handler_registry.append(callback)
@@ -155,7 +151,7 @@ class Consumer(AbstractChannel):
 
     async def _recv_loop(self) -> None:
         if self._connection is None:
-            raise RuntimeError('consumer is not opened yet.')
+            raise RuntimeError("consumer is not opened yet.")
         while True:
             try:
                 async with aclosing(self._connection.recv_message()) as agen:
@@ -173,11 +169,10 @@ class Consumer(AbstractChannel):
             except asyncio.CancelledError:
                 break
             except Exception:
-                log.exception('unexpected error')
+                log.exception("unexpected error")
 
     async def __aenter__(self) -> Consumer:
-        _opener = functools.partial(self._transport.connect,
-                                    self._connect)()
+        _opener = functools.partial(self._transport.connect, self._connect)()
         self._opener = _opener
         self._connection = await _opener.__aenter__()
         self._recv_task = asyncio.create_task(self._recv_loop())

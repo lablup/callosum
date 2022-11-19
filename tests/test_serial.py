@@ -1,4 +1,4 @@
-from callosum.serial import serial_lt, serial_gt
+from callosum.serial import serial_gt, serial_lt
 
 
 def test_serial_comparison():

@@ -1,33 +1,31 @@
 import asyncio
 import io
 import logging
-from typing import (
-    Any,
-    Optional,
-    Sequence,
-)
+from typing import Any, Optional, Sequence
 
 import async_timeout
 from thriftpy2.contrib.aio.processor import TAsyncProcessor
 from thriftpy2.contrib.aio.protocol.binary import TAsyncBinaryProtocol
-from thriftpy2.thrift import args_to_kwargs
-from thriftpy2.thrift import TApplicationException
-from thriftpy2.thrift import TMessageType
+from thriftpy2.thrift import TApplicationException, TMessageType, args_to_kwargs
 
-from . import BaseRPCClientAdaptor, BaseRPCServerAdaptor
-from ..rpc import RPCMessage, Peer
 from ..io import AsyncBytesIO
+from ..rpc import Peer, RPCMessage
+from . import BaseRPCClientAdaptor, BaseRPCServerAdaptor
 
 logger = logging.getLogger(__name__)
 
 
 class ThriftServerAdaptor(BaseRPCServerAdaptor):
 
-    __slots__ = BaseRPCServerAdaptor.__slots__ + \
-        ('_processor', '_protocol_cls', '_exec_timeout')
+    __slots__ = BaseRPCServerAdaptor.__slots__ + (
+        "_processor",
+        "_protocol_cls",
+        "_exec_timeout",
+    )
 
-    def __init__(self, peer: Peer, service, handler, *,
-                 exec_timeout: Optional[float] = None) -> None:
+    def __init__(
+        self, peer: Peer, service, handler, *, exec_timeout: Optional[float] = None
+    ) -> None:
         super().__init__(peer)
         self._processor = TAsyncProcessor(service, handler)
         self._protocol_cls = TAsyncBinaryProtocol
@@ -43,14 +41,14 @@ class ThriftServerAdaptor(BaseRPCServerAdaptor):
             with async_timeout.timeout(self._exec_timeout):
                 await self._processor.process(iproto, oproto)
         except (asyncio.IncompleteReadError, ConnectionError):
-            logger.debug('client has closed the connection')
+            logger.debug("client has closed the connection")
             writer_trans.close()
         except asyncio.TimeoutError:
-            logger.debug('timeout when processing the client request')
+            logger.debug("timeout when processing the client request")
             writer_trans.close()
             raise
         except asyncio.CancelledError:
-            logger.debug('service cancelled')
+            logger.debug("service cancelled")
             writer_trans.close()
             raise
         except Exception:
@@ -67,8 +65,11 @@ class ThriftServerAdaptor(BaseRPCServerAdaptor):
 
 class ThriftClientAdaptor(BaseRPCClientAdaptor):
 
-    __slots__ = BaseRPCClientAdaptor.__slots__ + \
-        ('_service', '_protocol_cls', '_seqid')
+    __slots__ = BaseRPCClientAdaptor.__slots__ + (
+        "_service",
+        "_protocol_cls",
+        "_seqid",
+    )
 
     def __init__(self, service):
         super().__init__()
@@ -86,11 +87,11 @@ class ThriftClientAdaptor(BaseRPCClientAdaptor):
 
             # Write to the output buffer with Thrift.
             kw = args_to_kwargs(
-                getattr(self._service, method + "_args").thrift_spec,
-                *args)
+                getattr(self._service, method + "_args").thrift_spec, *args
+            )
             kwargs.update(kw)
             oproto.write_message_begin(method, TMessageType.CALL, self._seqid)
-            api_args = getattr(self._service, method + '_args')()
+            api_args = getattr(self._service, method + "_args")()
             for k, v in kwargs.items():
                 setattr(api_args, k, v)
             api_args.write(oproto)
@@ -111,14 +112,15 @@ class ThriftClientAdaptor(BaseRPCClientAdaptor):
             if rseqid != self._seqid:
                 raise TApplicationException(
                     TApplicationException.BAD_SEQUENCE_ID,
-                    fname + ' failed: out of sequence response')
+                    fname + " failed: out of sequence response",
+                )
 
             if mtype == TMessageType.EXCEPTION:
                 x = TApplicationException()
                 await iproto.read_struct(x)
                 await iproto.read_message_end()
                 raise x
-            result = getattr(self._service, method + '_result')()
+            result = getattr(self._service, method + "_result")()
             await iproto.read_struct(result)
             await iproto.read_message_end()
 
@@ -127,7 +129,7 @@ class ThriftClientAdaptor(BaseRPCClientAdaptor):
             if len(result.thrift_spec) == 0:
                 yield None
             for k, v in result.__dict__.items():
-                if k != 'success' and v:
+                if k != "success" and v:
                     raise v
         finally:
             writer_trans.close()
