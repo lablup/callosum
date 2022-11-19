@@ -5,7 +5,7 @@ from typing import (
     Any,
 )
 
-import attr
+import attrs
 from dateutil.tz import tzutc
 import temporenc
 
@@ -16,7 +16,7 @@ from ..abc import (
 from ..serialize import mpackb, munpackb
 
 
-@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
+@attrs.define(frozen=True, slots=True, auto_attribs=True)
 class StreamMessage(AbstractMessage):
     # header parts
     created_at: datetime

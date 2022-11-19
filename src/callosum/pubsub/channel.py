@@ -47,9 +47,9 @@ class Publisher(AbstractChannel):
     def __init__(
         self, *,
         serializer: AbstractSerializer,
-        bind: AbstractAddress = None,
-        transport: Type[BaseTransport] = None,
-        authenticator: AbstractAuthenticator = None,
+        bind: Optional[AbstractAddress] = None,
+        transport: Optional[Type[BaseTransport]] = None,
+        authenticator: Optional[AbstractAuthenticator] = None,
         transport_opts: Mapping[str, Any] = {},
     ) -> None:
         if bind is None:
@@ -120,9 +120,9 @@ class Consumer(AbstractChannel):
     def __init__(
         self, *,
         deserializer: AbstractDeserializer,
-        connect: AbstractAddress = None,
-        transport: Type[BaseTransport] = None,
-        authenticator: AbstractAuthenticator = None,
+        connect: Optional[AbstractAddress] = None,
+        transport: Optional[Type[BaseTransport]] = None,
+        authenticator: Optional[AbstractAuthenticator] = None,
         transport_opts: Mapping[str, Any] = {},
         scheduler=None,
         max_concurrency: int = 100,

@@ -115,9 +115,9 @@ class BaseTransport(metaclass=abc.ABCMeta):
 
     def __init__(
         self,
-        authenticator: AbstractAuthenticator = None,
+        authenticator: Optional[AbstractAuthenticator] = None,
         *,
-        transport_opts: Mapping[str, Any] = None,
+        transport_opts: Optional[Mapping[str, Any]] = None,
         **kwargs,
     ) -> None:
         self.authenticator = authenticator

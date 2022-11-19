@@ -3,17 +3,17 @@ from __future__ import annotations
 import abc
 from typing import Optional
 
-import attr
+import attrs
 import zmq
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class AuthResult:
     success: bool
     user_id: Optional[str] = None
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class Identity:
     domain: str
     private_key: bytes

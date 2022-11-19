@@ -15,7 +15,7 @@ from typing import (
 import secrets
 import warnings
 
-import attr
+import attrs
 import zmq, zmq.asyncio, zmq.utils.monitor
 
 from ..abc import RawHeaderBody
@@ -34,7 +34,7 @@ _default_zsock_opts = {
 }
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ZeroMQAddress(AbstractAddress):
     uri: Union[str, Tuple[str, int]]
 
@@ -231,7 +231,7 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         addr: AbstractAddress,
         *,
         attach_monitor: bool = False,
-        zsock_opts: Mapping[int, Any] = None,
+        zsock_opts: Optional[Mapping[int, Any]] = None,
         **transport_opts,
     ) -> None:
         super().__init__(transport, addr)
@@ -298,7 +298,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         addr: AbstractAddress,
         *,
         attach_monitor: bool = False,
-        zsock_opts: Mapping[int, Any] = None,
+        zsock_opts: Optional[Mapping[int, Any]] = None,
         **transport_opts,
     ) -> None:
         super().__init__(transport, addr)

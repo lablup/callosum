@@ -12,7 +12,7 @@ from typing import (
 
 from aiotools import aclosing
 from async_timeout import timeout
-import attr
+import attrs
 
 from ..abc import (
     QueueSentinel,
@@ -73,17 +73,17 @@ class Peer(AbstractChannel):
         self, *,
         deserializer: AbstractDeserializer,
         serializer: AbstractSerializer,
-        connect: AbstractAddress = None,
-        bind: AbstractAddress = None,
-        transport: Type[BaseTransport] = None,
-        authenticator: AbstractAuthenticator = None,
-        transport_opts: Mapping[str, Any] = None,
-        scheduler: AbstractAsyncScheduler = None,
+        connect: Optional[AbstractAddress] = None,
+        bind: Optional[AbstractAddress] = None,
+        transport: Optional[Type[BaseTransport]] = None,
+        authenticator: Optional[AbstractAuthenticator] = None,
+        transport_opts: Optional[Mapping[str, Any]] = None,
+        scheduler: Optional[AbstractAsyncScheduler] = None,
         compress: bool = True,
         max_body_size: int = 10 * (2**20),  # 10 MiBytes
         max_concurrency: int = 100,
-        execute_timeout: float = None,
-        invoke_timeout: float = None,
+        execute_timeout: Optional[float] = None,
+        invoke_timeout: Optional[float] = None,
         debug_rpc: bool = False,
     ) -> None:
         if connect is None and bind is None:
@@ -356,9 +356,9 @@ class Peer(AbstractChannel):
                 server_cancelled = True
                 raise asyncio.CancelledError
             elif response.msgtype == RPCMessageTypes.FAILURE:
-                raise RPCUserError(*attr.astuple(response.metadata))
+                raise RPCUserError(*attrs.astuple(response.metadata))
             elif response.msgtype == RPCMessageTypes.ERROR:
-                raise RPCInternalError(*attr.astuple(response.metadata))
+                raise RPCInternalError(*attrs.astuple(response.metadata))
             return upper_result
         except (asyncio.TimeoutError, asyncio.CancelledError):
             # propagate cancellation to the connected peer

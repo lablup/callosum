@@ -8,7 +8,7 @@ from typing import (
 )
 
 import aioredis
-import attr
+import attrs
 
 from ..abc import RawHeaderBody
 from ..exceptions import InvalidAddressError
@@ -20,7 +20,7 @@ from . import (
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class RedisStreamAddress(AbstractAddress):
     '''
     Group and consumer are only required by receiver-side.

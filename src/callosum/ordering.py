@@ -16,7 +16,7 @@ from typing import (
     Union,
 )
 
-import attr
+import attrs
 
 from .serial import serial_lt
 from .abc import TaskSentinel
@@ -91,7 +91,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
 
 
 @functools.total_ordering
-@attr.dataclass(frozen=True, slots=True, eq=False, order=False)
+@attrs.define(frozen=True, slots=True, eq=False, order=False)
 class _SeqItem:
     method: str
     seq: int

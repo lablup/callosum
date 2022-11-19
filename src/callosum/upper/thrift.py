@@ -3,6 +3,7 @@ import io
 import logging
 from typing import (
     Any,
+    Optional,
     Sequence,
 )
 
@@ -26,7 +27,7 @@ class ThriftServerAdaptor(BaseRPCServerAdaptor):
         ('_processor', '_protocol_cls', '_exec_timeout')
 
     def __init__(self, peer: Peer, service, handler, *,
-                 exec_timeout: float = None) -> None:
+                 exec_timeout: Optional[float] = None) -> None:
         super().__init__(peer)
         self._processor = TAsyncProcessor(service, handler)
         self._protocol_cls = TAsyncBinaryProtocol

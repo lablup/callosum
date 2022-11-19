@@ -8,7 +8,7 @@ from typing import (
 )
 
 import aioredis
-import attr
+import attrs
 
 from ..abc import RawHeaderBody
 from . import (
@@ -19,7 +19,7 @@ from . import (
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class RedisStreamAddress(AbstractAddress):
     redis_server: Union[str, Tuple[str, int]]
     stream_key: str

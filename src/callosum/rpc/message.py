@@ -7,7 +7,7 @@ from typing import (
     Any, Final, Optional,
 )
 
-import attr
+import attrs
 try:
     import snappy  # type: ignore
     has_snappy: Final = True
@@ -42,7 +42,8 @@ class TupleEncodingMixin:
 
     def encode(self) -> bytes:
         cls = type(self)
-        values = [getattr(self, f.name) for f in attr.fields(cls)]
+        fields = attrs.fields(cls)  # type: ignore
+        values = [getattr(self, f.name) for f in fields]
         return mpackb(values)
 
 
@@ -53,24 +54,24 @@ class Metadata(TupleEncodingMixin, object):
     pass
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class FunctionMetadata(Metadata):
     pass
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class ResultMetadata(Metadata):
     pass
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class ErrorMetadata(Metadata):
     name: str
     repr: str
     traceback: str
 
 
-@attr.dataclass(frozen=True, slots=True)
+@attrs.define(frozen=True, slots=True)
 class NullMetadata(Metadata):
     pass
 
@@ -97,7 +98,7 @@ metadata_types = (
 )
 
 
-@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
+@attrs.define(frozen=True, slots=True, auto_attribs=True)
 class RPCMessage(AbstractMessage):
 
     # transport-layer annotations
