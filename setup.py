@@ -59,7 +59,7 @@ docs_requires = [
 ]
 
 thrift_requires = [
-    "thriftpy2>=0.4.9",
+    "thriftpy2>=0.4.16",
 ]
 
 zmq_requires = [
