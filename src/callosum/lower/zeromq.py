@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+import time
 import warnings
 from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 
@@ -33,6 +34,7 @@ ZAP_VERSION = b"1.0"
 _default_zsock_opts = {
     zmq.LINGER: 100,
 }
+log = logging.getLogger(__name__)
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -410,6 +412,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
     async def __aenter__(self) -> ZeroMQRPCConnection:
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
+        handshake_begin = time.perf_counter()
         client_sock = self.transport._zctx.socket(type(self).socket_type)
         await init_authenticator(self.transport.authenticator, client_sock)
         for key, value in self._zsock_opts.items():
@@ -428,6 +431,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         self.transport._sock = client_sock
         if not await self.ping():
             raise AuthenticationError
+        handshake_done = time.perf_counter()
+        log.debug(
+            "ZeroMQ connector handshake latency: %.3f sec",
+            handshake_done - handshake_begin,
+        )
         return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):

@@ -146,7 +146,7 @@ async def serve(scheduler_type: str) -> None:
 @click.argument(
     "scheduler_type",
     default="exit-ordered",
-    type=click.Choice(scheduler_types.keys()),
+    type=click.Choice([*scheduler_types.keys()]),
 )
 def main(scheduler_type):
     asyncio.run(serve(scheduler_type))
