@@ -15,7 +15,11 @@ from zmq.utils import z85
 from callosum.exceptions import AuthenticationError
 
 from ..abc import RawHeaderBody
-from ..auth import AbstractAuthenticator, Credential
+from ..auth import (
+    AbstractClientAuthenticator,
+    AbstractServerAuthenticator,
+    Credential,
+)
 from . import (
     AbstractAddress,
     AbstractBinder,
@@ -48,7 +52,7 @@ class ZAPServer:
     def __init__(
         self,
         zctx: zmq.asyncio.Context,
-        authenticator: Optional[AbstractAuthenticator] = None,
+        authenticator: Optional[AbstractServerAuthenticator] = None,
     ) -> None:
         self._log = logging.getLogger(__name__ + ".ZAPServer")
         self._authenticator = authenticator
@@ -168,6 +172,28 @@ class ZAPServer:
         )
         assert self._zap_socket is not None
         await self._zap_socket.send_multipart(reply)
+
+
+async def init_authenticator(
+    authenticator: AbstractServerAuthenticator | AbstractClientAuthenticator | None,
+    sock: zmq.asyncio.Socket,
+) -> None:
+    match authenticator:
+        case AbstractServerAuthenticator() as auth:
+            server_id = await auth.server_identity()
+            sock.zap_domain = server_id.domain.encode("utf8")
+            sock.setsockopt(zmq.CURVE_SERVER, 1)
+            sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
+        case AbstractClientAuthenticator() as auth:
+            client_id = await auth.client_identity()
+            client_public_key = await auth.client_public_key()
+            server_public_key = await auth.server_public_key()
+            sock.zap_domain = client_id.domain.encode("utf8")
+            sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
+            sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
+            sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
+        case None:
+            pass
 
 
 class ZeroMQRPCConnection(AbstractConnection):
@@ -295,15 +321,21 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
                 RuntimeWarning,
             )
 
+    async def ping(self, ping_timeout: int = 100) -> bool:
+        assert self._main_sock is not None
+        sock: zmq.asyncio.Socket = self._main_sock
+        await sock.send_multipart([b"PING", b"", b""])
+        ret = await sock.poll(ping_timeout)
+        if ret == 0:
+            return False
+        response = await sock.recv_multipart()
+        return response[0] == b"PONG"
+
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
         server_sock = self.transport._zctx.socket(type(self).socket_type)
-        if self.transport.authenticator:
-            server_id = await self.transport.authenticator.server_identity()
-            server_sock.zap_domain = server_id.domain.encode("utf8")
-            server_sock.setsockopt(zmq.CURVE_SERVER, 1)
-            server_sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
+        await init_authenticator(self.transport.authenticator, server_sock)
         for key, value in self._zsock_opts.items():
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
@@ -379,15 +411,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
         client_sock = self.transport._zctx.socket(type(self).socket_type)
-        if self.transport.authenticator:
-            auth = self.transport.authenticator
-            client_id = await auth.client_identity()
-            client_public_key = await auth.client_public_key()
-            server_public_key = await auth.server_public_key()
-            client_sock.zap_domain = client_id.domain.encode("utf8")
-            client_sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
-            client_sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
-            client_sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
+        await init_authenticator(self.transport.authenticator, client_sock)
         for key, value in self._zsock_opts.items():
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
@@ -472,15 +496,22 @@ class ZeroMQBaseTransport(BaseTransport):
     binder_cls: ClassVar[Type[ZeroMQBaseBinder]]
     connector_cls: ClassVar[Type[ZeroMQBaseConnector]]
 
-    def __init__(self, authenticator: AbstractAuthenticator, **kwargs) -> None:
+    def __init__(
+        self,
+        authenticator: AbstractClientAuthenticator | AbstractServerAuthenticator,
+        **kwargs,
+    ) -> None:
         super().__init__(authenticator, **kwargs)
         loop = asyncio.get_running_loop()
         self._zap_server = None
         self._zap_task = None
         self._zctx = zmq.asyncio.Context()
-        if self.authenticator:
-            self._zap_server = ZAPServer(self._zctx, self.authenticator)
-            self._zap_task = loop.create_task(self._zap_server.serve())
+        match self.authenticator:
+            case AbstractServerAuthenticator() as auth:
+                self._zap_server = ZAPServer(self._zctx, auth)
+                self._zap_task = loop.create_task(self._zap_server.serve())
+            case _:
+                pass
         # Keep sockets during the transport lifetime.
         self._sock = None
 

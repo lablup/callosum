@@ -6,7 +6,8 @@ import pytest
 import zmq
 
 from callosum.auth import (
-    AbstractAuthenticator,
+    AbstractClientAuthenticator,
+    AbstractServerAuthenticator,
     AuthResult,
     Credential,
     Identity,
@@ -29,7 +30,7 @@ client1_keypair = create_keypair()
 client2_keypair = create_keypair()
 
 
-class MyServerAuthenticator(AbstractAuthenticator):
+class MyServerAuthenticator(AbstractServerAuthenticator):
     def __init__(self, domain: str, server_keypair: Tuple[bytes, bytes]) -> None:
         self.domain = domain
         self._public_key = server_keypair[0]
@@ -61,7 +62,7 @@ class MyServerAuthenticator(AbstractAuthenticator):
         raise NotImplementedError
 
 
-class MyClientAuthenticator(AbstractAuthenticator):
+class MyClientAuthenticator(AbstractClientAuthenticator):
     def __init__(
         self,
         domain: str,
@@ -91,7 +92,7 @@ class MyClientAuthenticator(AbstractAuthenticator):
 
 @asynccontextmanager
 async def server(
-    auth: Optional[AbstractAuthenticator],
+    auth: Optional[AbstractServerAuthenticator],
 ) -> AsyncIterator[str]:
     scheduler = ExitOrderedAsyncScheduler()
     # Bind to a random port to avoid conflicts between different test cases.
@@ -113,7 +114,10 @@ async def server(
     print("server terminated")
 
 
-async def client(endpoint: str, auth: Optional[AbstractAuthenticator]) -> None:
+async def client(
+    endpoint: str,
+    auth: Optional[AbstractClientAuthenticator],
+) -> None:
     peer = Peer(
         connect=ZeroMQAddress(endpoint),
         transport=ZeroMQRPCTransport,

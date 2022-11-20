@@ -35,7 +35,7 @@ def create_keypair():
     return public_key, private_key
 
 
-class AbstractAuthenticator(metaclass=abc.ABCMeta):
+class AbstractServerAuthenticator(metaclass=abc.ABCMeta):
     """
     Users of Callosum should subclass this to implement custom authentication.
 
@@ -45,8 +45,6 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
     encryption and/or authentication scheme while leaving this authenticator as an
     application-level identity management scheme.
     """
-
-    # === Binder APIs ===
 
     @abc.abstractmethod
     async def server_identity(self) -> Identity:
@@ -64,8 +62,16 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
-    # === Connector APIs ===
+    @abc.abstractmethod
+    async def server_public_key(self) -> bytes:
+        """
+        Return the public key of the server.
+        Only used by the connector.
+        """
+        raise NotImplementedError
 
+
+class AbstractClientAuthenticator(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def server_public_key(self) -> bytes:
         """

@@ -4,7 +4,7 @@ import abc
 from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 
 from ..abc import RawHeaderBody
-from ..auth import AbstractAuthenticator
+from ..auth import AbstractClientAuthenticator, AbstractServerAuthenticator
 
 
 class AbstractMessagingMixin(metaclass=abc.ABCMeta):
@@ -103,12 +103,16 @@ class BaseTransport(metaclass=abc.ABCMeta):
         "authenticator",
         "transport_opts",
     )
-    authenticator: Optional[AbstractAuthenticator]
+    authenticator: Optional[
+        AbstractClientAuthenticator | AbstractServerAuthenticator
+    ]
     transport_opts: Mapping[str, Any]
 
     def __init__(
         self,
-        authenticator: Optional[AbstractAuthenticator] = None,
+        authenticator: Optional[
+            AbstractClientAuthenticator | AbstractServerAuthenticator
+        ] = None,
         *,
         transport_opts: Optional[Mapping[str, Any]] = None,
         **kwargs,

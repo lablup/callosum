@@ -13,7 +13,7 @@ from ..abc import (
     AbstractSerializer,
     QueueSentinel,
 )
-from ..auth import AbstractAuthenticator
+from ..auth import AbstractClientAuthenticator, AbstractServerAuthenticator
 from ..lower import (
     AbstractAddress,
     AbstractBinder,
@@ -44,7 +44,9 @@ class Publisher(AbstractChannel):
         serializer: AbstractSerializer,
         bind: Optional[AbstractAddress] = None,
         transport: Optional[Type[BaseTransport]] = None,
-        authenticator: Optional[AbstractAuthenticator] = None,
+        authenticator: Optional[
+            AbstractClientAuthenticator | AbstractServerAuthenticator
+        ] = None,
         transport_opts: Mapping[str, Any] = {},
     ) -> None:
         if bind is None:
@@ -117,7 +119,9 @@ class Consumer(AbstractChannel):
         deserializer: AbstractDeserializer,
         connect: Optional[AbstractAddress] = None,
         transport: Optional[Type[BaseTransport]] = None,
-        authenticator: Optional[AbstractAuthenticator] = None,
+        authenticator: Optional[
+            AbstractClientAuthenticator | AbstractServerAuthenticator
+        ] = None,
         transport_opts: Mapping[str, Any] = {},
         scheduler=None,
         max_concurrency: int = 100,

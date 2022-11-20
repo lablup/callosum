@@ -27,7 +27,7 @@ from ..abc import (
     QueueSentinel,
     TaskSentinel,
 )
-from ..auth import AbstractAuthenticator
+from ..auth import AbstractClientAuthenticator, AbstractServerAuthenticator
 from ..lower import (
     AbstractAddress,
     AbstractBinder,
@@ -84,7 +84,9 @@ class Peer(AbstractChannel):
         connect: Optional[AbstractAddress] = None,
         bind: Optional[AbstractAddress] = None,
         transport: Optional[Type[BaseTransport]] = None,
-        authenticator: Optional[AbstractAuthenticator] = None,
+        authenticator: Optional[
+            AbstractClientAuthenticator | AbstractServerAuthenticator
+        ] = None,
         transport_opts: Optional[Mapping[str, Any]] = None,
         scheduler: Optional[AbstractAsyncScheduler] = None,
         compress: bool = True,
