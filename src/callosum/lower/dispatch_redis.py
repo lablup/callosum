@@ -60,26 +60,28 @@ class DispatchRedisConnection(AbstractConnection):
         async def _xack(raw_msg):
             await self.transport._redis.xack(raw_msg[0], self.addr.group, raw_msg[1])
 
-        try:
-            raw_msgs = await _s(
-                self.transport._redis.xread_group(
-                    self.addr.group,
-                    self.addr.consumer,
-                    [stream_key],
-                    latest_ids=[">"],
+        while True:
+            try:
+                raw_msgs = await _s(
+                    self.transport._redis.xread_group(
+                        self.addr.group,
+                        self.addr.consumer,
+                        [stream_key],
+                        latest_ids=[">"],
+                    )
                 )
-            )
-            for raw_msg in raw_msgs:
-                # [0]: stream key, [1]: item ID
-                if b"meta" in raw_msg[2]:
+                for raw_msg in raw_msgs:
+                    # [0]: stream key, [1]: item ID
+                    if b"meta" in raw_msg[2]:
+                        await _s(_xack(raw_msg))
+                        continue
+                    yield RawHeaderBody(raw_msg[2][b"hdr"], raw_msg[2][b"msg"], None)
                     await _s(_xack(raw_msg))
-                    continue
-                yield RawHeaderBody(raw_msg[2][b"hdr"], raw_msg[2][b"msg"], None)
-                await _s(_xack(raw_msg))
-        except asyncio.CancelledError:
-            raise
-        except aioredis.errors.ConnectionForcedCloseError:
-            yield None
+            except asyncio.CancelledError:
+                raise
+            except aioredis.errors.ConnectionForcedCloseError:
+                yield None
+                return
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
         # assert not self.transport._redis.closed

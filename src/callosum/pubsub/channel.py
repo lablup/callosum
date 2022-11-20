@@ -152,24 +152,23 @@ class Consumer(AbstractChannel):
     async def _recv_loop(self) -> None:
         if self._connection is None:
             raise RuntimeError("consumer is not opened yet.")
-        while True:
-            try:
-                async with aclosing(self._connection.recv_message()) as agen:
-                    async for raw_msg in agen:
-                        if raw_msg is None:
-                            return
-                        msg = StreamMessage.decode(raw_msg, self._deserializer)
-                        for handler in self._handler_registry:
-                            if asyncio.iscoroutinefunction(handler):
-                                asyncio.create_task(self._task_wrapper(handler, msg))
-                                # TODO: keep weak-refs to tasks and use it to
-                                #       cancel running tasks upon shutdown
-                            else:
-                                handler(msg)
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                log.exception("unexpected error")
+        try:
+            async with aclosing(self._connection.recv_message()) as agen:
+                async for raw_msg in agen:
+                    if raw_msg is None:
+                        return
+                    msg = StreamMessage.decode(raw_msg, self._deserializer)
+                    for handler in self._handler_registry:
+                        if asyncio.iscoroutinefunction(handler):
+                            asyncio.create_task(self._task_wrapper(handler, msg))
+                            # TODO: keep weak-refs to tasks and use it to
+                            #       cancel running tasks upon shutdown
+                        else:
+                            handler(msg)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception("unexpected error")
 
     async def __aenter__(self) -> Consumer:
         _opener = functools.partial(self._transport.connect, self._connect)()

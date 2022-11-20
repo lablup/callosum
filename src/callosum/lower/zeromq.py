@@ -4,24 +4,18 @@ import asyncio
 import logging
 import secrets
 import warnings
-from typing import (
-    Any,
-    AsyncGenerator,
-    ClassVar,
-    Mapping,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 
 import attrs
 import zmq
 import zmq.asyncio
 import zmq.utils.monitor
+from zmq.utils import z85
+
+from callosum.exceptions import AuthenticationError
 
 from ..abc import RawHeaderBody
-from ..auth import Identity
+from ..auth import AbstractAuthenticator, Credential
 from . import (
     AbstractAddress,
     AbstractBinder,
@@ -39,7 +33,7 @@ _default_zsock_opts = {
 
 @attrs.define(auto_attribs=True, slots=True)
 class ZeroMQAddress(AbstractAddress):
-    uri: Union[str, Tuple[str, int]]
+    uri: str
 
 
 class ZAPServer:
@@ -51,7 +45,11 @@ class ZAPServer:
     _zap_socket: Optional[zmq.asyncio.Socket]
     _zctx: zmq.asyncio.Context
 
-    def __init__(self, zctx: zmq.asyncio.Context, authenticator=None) -> None:
+    def __init__(
+        self,
+        zctx: zmq.asyncio.Context,
+        authenticator: Optional[AbstractAuthenticator] = None,
+    ) -> None:
         self._log = logging.getLogger(__name__ + ".ZAPServer")
         self._authenticator = authenticator
         self._zap_socket = None
@@ -63,8 +61,11 @@ class ZAPServer:
         self._zap_socket.bind("inproc://zeromq.zap.01")
         try:
             while True:
-                msg = await self._zap_socket.recv_multipart()
-                await self.handle_zap_message(msg)
+                try:
+                    msg = await self._zap_socket.recv_multipart()
+                    await self.handle_zap_message(msg)
+                except Exception:
+                    self._log.exception("unexpected error in the ZAPServer handler")
         except asyncio.CancelledError:
             pass
         finally:
@@ -86,6 +87,7 @@ class ZAPServer:
             return
 
         version, request_id, domain, address, sock_identity, mechanism = msg[:6]
+        self._log.debug("zap message %s", msg)
         credentials = msg[6:]
         domain = domain.decode("utf8", "replace")
         address = address.decode("utf8", "replace")
@@ -117,16 +119,24 @@ class ZAPServer:
         if mechanism == b"CURVE":
             # For CURVE, even a whitelisted address must authenticate
             if len(credentials) != 1:
-                self._log.info("Invalid CURVE credentials: %r", credentials)
+                self._log.warning("Invalid CURVE credentials: %r", credentials)
                 await self._send_zap_reply(
                     request_id, b"400", b"Invalid credentials"
                 )
                 return
-            key = credentials[0]
-            client_id = Identity(domain, key)
-            result = await self._authenticator.check_client(client_id)
+            client_pubkey = z85.encode(credentials[0])
+            creds = Credential(domain, client_pubkey)
+            result = await self._authenticator.check_client(creds)
+            self._log.info(
+                "authentication result with credentials %r -> %r",
+                creds,
+                result,
+            )
             allowed = result.success
             if allowed:
+                assert (
+                    result.user_id is not None
+                ), "expected valid user ID from check_client() callback"
                 user_id = result.user_id
         else:
             # In Callosum, we only support public-key based authentication.
@@ -134,6 +144,7 @@ class ZAPServer:
             reason = b"Unsupported authentication mechanism"
 
         if allowed:
+            assert user_id is not None
             await self._send_zap_reply(request_id, b"200", b"OK", user_id)
         else:
             await self._send_zap_reply(request_id, b"400", reason)
@@ -171,14 +182,26 @@ class ZeroMQRPCConnection(AbstractConnection):
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         assert not self.transport._closed
         assert self.transport._sock is not None
-        *pre, raw_header, raw_body = await self.transport._sock.recv_multipart()
-        if len(pre) > 0:
-            # server
-            peer_id = pre[0]
-            yield RawHeaderBody(raw_header, raw_body, peer_id)
-        else:
-            # client
-            yield RawHeaderBody(raw_header, raw_body, None)
+        while True:
+            multipart_msg = await self.transport._sock.recv_multipart()
+            *pre, zmsg_type, raw_header, raw_body = multipart_msg
+            if zmsg_type == b"PING":
+                await self.transport._sock.send_multipart(
+                    [
+                        *pre,
+                        b"PONG",
+                        raw_header,
+                        raw_body,
+                    ]
+                )
+            elif zmsg_type == b"UPPER":
+                if len(pre) > 0:
+                    # server
+                    peer_id = pre[0]
+                    yield RawHeaderBody(raw_header, raw_body, peer_id)
+                else:
+                    # client
+                    yield RawHeaderBody(raw_header, raw_body, None)
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
         assert not self.transport._closed
@@ -189,6 +212,7 @@ class ZeroMQRPCConnection(AbstractConnection):
             await self.transport._sock.send_multipart(
                 [
                     peer_id,
+                    b"UPPER",
                     raw_msg.header,
                     raw_msg.body,
                 ]
@@ -197,6 +221,7 @@ class ZeroMQRPCConnection(AbstractConnection):
             # client
             await self.transport._sock.send_multipart(
                 [
+                    b"UPPER",
                     raw_msg.header,
                     raw_msg.body,
                 ]
@@ -313,6 +338,9 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         "_zsock_opts",
     )
 
+    _monitor_sock: Optional[zmq.asyncio.Socket]
+    _main_sock: Optional[zmq.asyncio.Socket]
+    _monitor_task: Optional[asyncio.Task]
     socket_type: ClassVar[int] = 0
 
     transport: ZeroMQBaseTransport
@@ -337,7 +365,17 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
                 RuntimeWarning,
             )
 
-    async def __aenter__(self):
+    async def ping(self, ping_timeout: int = 100) -> bool:
+        assert self._main_sock is not None
+        sock: zmq.asyncio.Socket = self._main_sock
+        await sock.send_multipart([b"PING", b"", b""])
+        ret = await sock.poll(ping_timeout)
+        if ret == 0:
+            return False
+        response = await sock.recv_multipart()
+        return response[0] == b"PONG"
+
+    async def __aenter__(self) -> ZeroMQRPCConnection:
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
         client_sock = self.transport._zctx.socket(type(self).socket_type)
@@ -364,9 +402,12 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         client_sock.connect(self.addr.uri)
         self._main_sock = client_sock
         self.transport._sock = client_sock
+        if not await self.ping():
+            raise AuthenticationError
         return ZeroMQRPCConnection(self.transport)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        assert self._main_sock is not None
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
@@ -426,10 +467,12 @@ class ZeroMQBaseTransport(BaseTransport):
         "_sock",
     )
 
+    _sock: Optional[zmq.asyncio.Socket]
+
     binder_cls: ClassVar[Type[ZeroMQBaseBinder]]
     connector_cls: ClassVar[Type[ZeroMQBaseConnector]]
 
-    def __init__(self, authenticator, **kwargs) -> None:
+    def __init__(self, authenticator: AbstractAuthenticator, **kwargs) -> None:
         super().__init__(authenticator, **kwargs)
         loop = asyncio.get_running_loop()
         self._zap_server = None
@@ -444,17 +487,17 @@ class ZeroMQBaseTransport(BaseTransport):
     @property
     def _closed(self) -> bool:
         if self._sock is not None:
-            return self._sock.closed
+            return self._sock.closed  # type: ignore
         return True
 
     async def close(self) -> None:
         if self._sock is not None:
             self._sock.close()
-        if self._zap_task is not None:
+        if self._zap_task is not None and not self._zap_task.done():
             self._zap_task.cancel()
             await self._zap_task
         if self._zctx is not None:
-            self._zctx.destroy()
+            self._zctx.destroy(linger=50)
 
 
 class ZeroMQRPCTransport(ZeroMQBaseTransport):

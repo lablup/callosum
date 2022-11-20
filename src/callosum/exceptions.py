@@ -9,6 +9,10 @@ class ConfigurationError(CallosumError):
     pass
 
 
+class AuthenticationError(CallosumError):
+    pass
+
+
 class InvalidAddressError(CallosumError, ValueError):
     def __init__(self, invalid_param: Optional[str] = None):
         if invalid_param:

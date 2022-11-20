@@ -19,7 +19,13 @@ class Identity:
     private_key: bytes
 
 
-def create_keypair(self):
+@attrs.define(frozen=True, slots=True)
+class Credential:
+    domain: str
+    public_key: bytes
+
+
+def create_keypair():
     """
     Generate a new CURVE-25519 public-private keypair.
     """
@@ -51,7 +57,7 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def check_client(self, client_id: Identity) -> AuthResult:
+    async def check_client(self, creds: Credential) -> AuthResult:
         """
         Check if the given domain and client public key is a valid one or not.
         Only used by the binder.
