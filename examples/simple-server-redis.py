@@ -4,11 +4,8 @@ import os
 import signal
 import time
 
+from callosum.lower.rpc_redis import RedisStreamAddress, RPCRedisTransport
 from callosum.rpc import Peer
-from callosum.lower.rpc_redis import (
-    RedisStreamAddress,
-    RPCRedisTransport,
-)
 
 
 async def handle_echo(request):
