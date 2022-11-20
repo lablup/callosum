@@ -96,8 +96,6 @@ setup(
         "Operating System :: MacOS :: MacOS X",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
@@ -112,7 +110,7 @@ setup(
         "callosum": ["py.typed"],
     },
     include_package_data=True,
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     setup_requires=["setuptools>=61.0"],
     install_requires=install_requires,
     extras_require={
