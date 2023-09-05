@@ -41,6 +41,7 @@ test_requires = [
 
 dev_requires: List[str] = [
     # 'pytest-sugar',
+    "pre-commit",
 ]
 
 lint_requires = [
