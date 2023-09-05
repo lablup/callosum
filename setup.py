@@ -45,13 +45,13 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    "flake8>=5.0.4",
-    "isort>=5.10.1",
-    "black>=22.10.0",
+    "black>=23.7.0",
+    "ruff>=0.0.287",
+    "ruff-lsp",
 ]
 
 typecheck_requires = [
-    "mypy>=0.991",
+    "mypy>=1.5.1",
     "types-python-dateutil",
 ]
 
