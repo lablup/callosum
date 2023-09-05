@@ -2,37 +2,29 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from collections import defaultdict
 import functools
 import heapq
 import logging
-from typing import (
-    Any,
-    Awaitable,
-    Dict,
-    Final,
-    List,
-    Optional,
-    Union,
-)
+from collections import defaultdict
+from typing import Any, Awaitable, Dict, Final, List, Optional, Union
 
-import attr
+import attrs
 
-from .serial import serial_lt
 from .abc import TaskSentinel
+from .serial import serial_lt
 
 SEQ_BITS: Final = 32
 
 
 def _resolve_future(request_id, fut, result, log) -> None:
     if fut is None:
-        log.warning('resolved unknown request: %r', request_id)
+        log.warning("resolved unknown request: %r", request_id)
         return
     if fut.done():
         if fut.cancelled():
-            log.debug('resolved cancelled request: %r', request_id)
+            log.debug("resolved cancelled request: %r", request_id)
         elif fut.exception() is not None:
-            log.debug('resolved errored request: %r', request_id)
+            log.debug("resolved errored request: %r", request_id)
         return
     if isinstance(result, BaseException):
         fut.set_exception(result)
@@ -41,18 +33,17 @@ def _resolve_future(request_id, fut, result, log) -> None:
 
 
 class AsyncResolver:
-
-    __slots__ = ('_log', '_futures')
+    __slots__ = ("_log", "_futures")
 
     _futures: Dict[_SeqItem, asyncio.Future]
 
     def __init__(self) -> None:
-        self._log = logging.getLogger(__name__ + '.AsyncResolver')
+        self._log = logging.getLogger(__name__ + ".AsyncResolver")
         self._futures = {}
 
     def wait(self, request_id) -> asyncio.Future:
         if request_id in self._futures:
-            raise RuntimeError('duplicate request: %r', request_id)
+            raise RuntimeError("duplicate request: %r", request_id)
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._futures[request_id] = fut
@@ -72,7 +63,6 @@ class AsyncResolver:
 
 
 class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
-
     @abc.abstractmethod
     async def schedule(self, request_id, coro) -> None:
         raise NotImplementedError
@@ -91,7 +81,7 @@ class AbstractAsyncScheduler(metaclass=abc.ABCMeta):
 
 
 @functools.total_ordering
-@attr.dataclass(frozen=True, slots=True, eq=False, order=False)
+@attrs.define(frozen=True, slots=True, eq=False, order=False)
 class _SeqItem:
     method: str
     seq: int
@@ -102,7 +92,7 @@ class _SeqItem:
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, _SeqItem):
-            raise TypeError('cannot compare equality with non-SeqItem object', other)
+            raise TypeError("cannot compare equality with non-SeqItem object", other)
         return self.seq == other.seq
 
 
@@ -112,14 +102,14 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
     ordering key while it allows overlapped execution.
     """
 
-    __slots__ = ('_log', '_futures', '_tasks', '_pending')
+    __slots__ = ("_log", "_futures", "_tasks", "_pending")
 
     _futures: Dict[_SeqItem, asyncio.Future]
     _tasks: Dict[_SeqItem, asyncio.Task]
     _pending: Dict[bytes, List[_SeqItem]]
 
     def __init__(self) -> None:
-        self._log = logging.getLogger(__name__ + '.KeySerializedAsyncScheduler')
+        self._log = logging.getLogger(__name__ + ".KeySerializedAsyncScheduler")
         self._futures = {}
         self._tasks = {}
         self._pending = defaultdict(list)
@@ -194,8 +184,9 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             # The task callback will notify the scheduler caller (upper).
             # The scheduler caller (upper) will call cleanup.
         else:
-            self._log.warning('cancellation of unknown or '
-                              'not sent yet request: %r', request_id)
+            self._log.warning(
+                "cancellation of unknown or " "not sent yet request: %r", request_id
+            )
 
 
 class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
@@ -203,18 +194,18 @@ class ExitOrderedAsyncScheduler(AbstractAsyncScheduler):
     A scheduler which let the asyncio's event loop do its own scheduling.
     """
 
-    __slots__ = ('_log', '_tasks')
+    __slots__ = ("_log", "_tasks")
 
     _tasks: Dict[_SeqItem, Union[TaskSentinel, asyncio.Task]]
 
     def __init__(self):
-        self._log = logging.getLogger(__name__ + '.ExitOrderedAsyncScheduler')
+        self._log = logging.getLogger(__name__ + ".ExitOrderedAsyncScheduler")
         self._tasks = {}
 
     async def schedule(self, request_id, coro) -> None:
         task = asyncio.create_task(coro)
         if request_id in self._tasks:
-            raise RuntimeError('duplicate request: %r', request_id)
+            raise RuntimeError("duplicate request: %r", request_id)
         self._tasks[request_id] = task
 
     async def get_fut(self, request_id) -> Union[TaskSentinel, Any]:

@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import (
-    Any,
-)
+from typing import Any
 
-import attr
-from dateutil.tz import tzutc
+import attrs
 import temporenc
+from dateutil.tz import tzutc
 
 from ..abc import (
-    AbstractSerializer, AbstractDeserializer,
-    AbstractMessage, RawHeaderBody,
+    AbstractDeserializer,
+    AbstractMessage,
+    AbstractSerializer,
+    RawHeaderBody,
 )
 from ..serialize import mpackb, munpackb
 
 
-@attr.dataclass(frozen=True, slots=True, auto_attribs=True)
+@attrs.define(frozen=True, slots=True, auto_attribs=True)
 class StreamMessage(AbstractMessage):
     # header parts
     created_at: datetime
@@ -30,8 +30,9 @@ class StreamMessage(AbstractMessage):
         return cls(created_at, body)
 
     @classmethod
-    def decode(cls, raw_msg: RawHeaderBody,
-               deserializer: AbstractDeserializer) -> StreamMessage:
+    def decode(
+        cls, raw_msg: RawHeaderBody, deserializer: AbstractDeserializer
+    ) -> StreamMessage:
         header = munpackb(raw_msg[0])
         created_at = temporenc.unpackb(header[0]).datetime()
         return cls(created_at, deserializer(raw_msg[1]))

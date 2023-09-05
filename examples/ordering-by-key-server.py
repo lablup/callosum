@@ -10,41 +10,44 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 
 async def handle_echo(request):
-    print('echo start')
+    print("echo start")
     await asyncio.sleep(1)
-    print('echo done')
+    print("echo done")
     return {
-        'received': request.body['sent'],
+        "received": request.body["sent"],
     }
 
 
 async def handle_add(request):
-    print('add start')
+    print("add start")
     await asyncio.sleep(0.5)
-    print('add done')
+    print("add done")
     return {
-        'result': request.body['a'] + request.body['b'],
+        "result": request.body["a"] + request.body["b"],
     }
 
 
 async def handle_delimeter(request):
-    print('------')
+    print("------")
 
 
 async def serve() -> None:
     peer = Peer(
-        bind=ZeroMQAddress('tcp://127.0.0.1:5010'),
+        bind=ZeroMQAddress("tcp://127.0.0.1:5010"),
         transport=ZeroMQRPCTransport,
         scheduler=KeySerializedAsyncScheduler(),
-        serializer=lambda o: json.dumps(o).encode('utf8'),
-        deserializer=lambda b: json.loads(b))
-    peer.handle_function('echo', handle_echo)
-    peer.handle_function('add', handle_add)
-    peer.handle_function('print_delim', handle_delimeter)
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    peer.handle_function("echo", handle_echo)
+    peer.handle_function("add", handle_add)
+    peer.handle_function("print_delim", handle_delimeter)
 
-    print('echo() will take 1 second and add() will take 0.5 second.')
-    print('You can confirm the effect of scheduler '
-          'and the ordering key by the console logs.\n')
+    print("echo() will take 1 second and add() will take 0.5 second.")
+    print(
+        "You can confirm the effect of scheduler "
+        "and the ordering key by the console logs.\n"
+    )
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()
@@ -52,12 +55,12 @@ async def serve() -> None:
     loop.add_signal_handler(signal.SIGTERM, forever.cancel)
     async with peer:
         try:
-            print('server started')
+            print("server started")
             await forever
         except asyncio.CancelledError:
             pass
-    print('server terminated')
+    print("server terminated")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(serve())

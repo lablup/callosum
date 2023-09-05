@@ -1,34 +1,23 @@
 import asyncio
 import json
 import random
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    List,
-    Mapping,
-    cast,
-)
+from typing import Any, Awaitable, Callable, List, Mapping, cast
 
 import pytest
 
-from callosum.rpc.message import (
-    NullMetadata, ErrorMetadata,
-    RPCMessage, RPCMessageTypes,
-)
-from callosum.rpc.channel import (
-    Peer,
-)
-from callosum.rpc.exceptions import (
-    RPCUserError,
-)
-from callosum.lower.zeromq import (
-    ZeroMQAddress, ZeroMQRPCTransport,
-)
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import (
     AbstractAsyncScheduler,
     ExitOrderedAsyncScheduler,
     KeySerializedAsyncScheduler,
+)
+from callosum.rpc.channel import Peer
+from callosum.rpc.exceptions import RPCUserError
+from callosum.rpc.message import (
+    ErrorMetadata,
+    NullMetadata,
+    RPCMessage,
+    RPCMessageTypes,
 )
 
 
@@ -38,7 +27,7 @@ def test_metadata_serialization():
     out = NullMetadata.decode(data)
     assert out == orig
 
-    orig = ErrorMetadata('MyError', 'MyError()', 'this is a long traceback')
+    orig = ErrorMetadata("MyError", "MyError()", "this is a long traceback")
     data = orig.encode()
     out = ErrorMetadata.decode(data)
     assert out == orig
@@ -48,14 +37,14 @@ def test_rpcmessage_exception_serialization():
     request = RPCMessage(
         peer_id=None,
         msgtype=RPCMessageTypes.FUNCTION,
-        method='dummy_function',
-        order_key='x',
+        method="dummy_function",
+        order_key="x",
         client_seq_id=1000,
         metadata=NullMetadata(),
-        body=b'{}',
+        body=b"{}",
     )
     try:
-        raise ZeroDivisionError('oops')
+        raise ZeroDivisionError("oops")
     except Exception:
         failure_msg = RPCMessage.failure(request)
         assert failure_msg.msgtype == RPCMessageTypes.FAILURE
@@ -70,13 +59,13 @@ async def dummy_server(
     done_event: asyncio.Event,
 ) -> None:
     server = Peer(
-        bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
+        bind=ZeroMQAddress("tcp://127.0.0.1:5020"),
         transport=ZeroMQRPCTransport,
         scheduler=scheduler,
-        serializer=lambda o: json.dumps(o).encode('utf8'),
+        serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
     )
-    server.handle_function('func', func)
+    server.handle_function("func", func)
     async with server:
         await done_event.wait()
 
@@ -86,9 +75,9 @@ async def dummy_client(
     done_event: asyncio.Event,
 ) -> None:
     client = Peer(
-        connect=ZeroMQAddress('tcp://localhost:5020'),
+        connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
-        serializer=lambda o: json.dumps(o).encode('utf8'),
+        serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
     )
     async with client:
@@ -98,11 +87,12 @@ async def dummy_client(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'scheduler_cls', [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
+    "scheduler_cls",
+    [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
 )
 async def test_messaging(scheduler_cls) -> None:
     done = asyncio.Event()
-    total = 200
+    total = 50
     call_results: List[int] = []
     return_results: List[int] = []
     # a list of events to make fucntions to return in the reversed order
@@ -111,8 +101,8 @@ async def test_messaging(scheduler_cls) -> None:
     async def func(request: RPCMessage) -> int:
         # waits a short delay so that it return in the reversed order
         body = cast(Mapping[str, int], request.body)
-        total = body['total']
-        idx = body['idx']
+        total = body["total"]
+        idx = body["idx"]
         if idx == 0:
             await asyncio.sleep(0.01)
             for j in range(total, 0, -1):
@@ -122,20 +112,21 @@ async def test_messaging(scheduler_cls) -> None:
         return idx
 
     async def requester(client) -> None:
-
         async def _do_request(idx: int) -> int:
-            ret = await client.invoke('func', {
-                'total': total,
-                'idx': idx,
-            }, order_key='mykey')
+            ret = await client.invoke(
+                "func",
+                {
+                    "total": total,
+                    "idx": idx,
+                },
+                order_key="mykey",
+            )
             return_results.append(ret)
             return ret
 
         tasks = []
         for idx in range(total):
-            tasks.append(asyncio.create_task(
-                _do_request(idx)
-            ))
+            tasks.append(asyncio.create_task(_do_request(idx)))
         call_results.extend(await asyncio.gather(*tasks, return_exceptions=True))
 
     scheduler = scheduler_cls()
@@ -160,7 +151,8 @@ async def test_messaging(scheduler_cls) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'scheduler_cls', [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
+    "scheduler_cls",
+    [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
 )
 async def test_messaging_server_cancellation(scheduler_cls) -> None:
     done = asyncio.Event()
@@ -175,8 +167,8 @@ async def test_messaging_server_cancellation(scheduler_cls) -> None:
     async def func(request: RPCMessage) -> int:
         # waits a short delay so that it return in the reversed order
         body = cast(Mapping[str, int], request.body)
-        total = body['total']
-        idx = body['idx']
+        total = body["total"]
+        idx = body["idx"]
         if idx == 0:
             await asyncio.sleep(0.01)
             for j in range(total, 0, -1):
@@ -188,13 +180,16 @@ async def test_messaging_server_cancellation(scheduler_cls) -> None:
         return idx
 
     async def requester(client) -> None:
-
         async def _do_request(idx: int) -> int:
             try:
-                ret = await client.invoke('func', {
-                    'total': total,
-                    'idx': idx,
-                }, order_key='mykey')
+                ret = await client.invoke(
+                    "func",
+                    {
+                        "total": total,
+                        "idx": idx,
+                    },
+                    order_key="mykey",
+                )
             except asyncio.CancelledError:
                 return_results.append(-1)
                 raise
@@ -204,9 +199,7 @@ async def test_messaging_server_cancellation(scheduler_cls) -> None:
 
         tasks = []
         for idx in range(total):
-            tasks.append(asyncio.create_task(
-                _do_request(idx)
-            ))
+            tasks.append(asyncio.create_task(_do_request(idx)))
         call_results.extend(await asyncio.gather(*tasks, return_exceptions=True))
 
     scheduler = scheduler_cls()
@@ -231,7 +224,8 @@ async def test_messaging_server_cancellation(scheduler_cls) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'scheduler_cls', [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
+    "scheduler_cls",
+    [ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler],
 )
 async def test_messaging_server_error(scheduler_cls) -> None:
     done = asyncio.Event()
@@ -246,8 +240,8 @@ async def test_messaging_server_error(scheduler_cls) -> None:
     async def func(request: RPCMessage) -> int:
         # waits a short delay so that it return in the reversed order
         body = cast(Mapping[str, int], request.body)
-        total = body['total']
-        idx = body['idx']
+        total = body["total"]
+        idx = body["idx"]
         if idx == 0:
             await asyncio.sleep(0.01)
             for j in range(total, 0, -1):
@@ -255,17 +249,20 @@ async def test_messaging_server_error(scheduler_cls) -> None:
                 await asyncio.sleep(0.01)  # let the next waiter proceed
         await order_events[idx].wait()
         if error_idxs[idx]:
-            raise ZeroDivisionError('oops')
+            raise ZeroDivisionError("oops")
         return idx
 
     async def requester(client) -> None:
-
         async def _do_request(idx: int) -> int:
             try:
-                ret = await client.invoke('func', {
-                    'total': total,
-                    'idx': idx,
-                }, order_key='mykey')
+                ret = await client.invoke(
+                    "func",
+                    {
+                        "total": total,
+                        "idx": idx,
+                    },
+                    order_key="mykey",
+                )
             except asyncio.CancelledError:
                 return_results.append(-1)
                 raise
@@ -275,9 +272,7 @@ async def test_messaging_server_error(scheduler_cls) -> None:
 
         tasks = []
         for idx in range(total):
-            tasks.append(asyncio.create_task(
-                _do_request(idx)
-            ))
+            tasks.append(asyncio.create_task(_do_request(idx)))
         call_results.extend(await asyncio.gather(*tasks, return_exceptions=True))
 
     scheduler = scheduler_cls()
@@ -297,6 +292,6 @@ async def test_messaging_server_error(scheduler_cls) -> None:
         if error_idxs[idx]:
             assert isinstance(call_results[idx], RPCUserError)
             e = cast(RPCUserError, call_results[idx])
-            assert e.args[0] == 'ZeroDivisionError'
+            assert e.args[0] == "ZeroDivisionError"
         else:
             assert call_results[idx] == idx

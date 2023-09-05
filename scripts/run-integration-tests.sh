@@ -2,6 +2,9 @@
 cd examples
 
 set -e
+export TERM=${TERM:-xterm}
+export REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+export REDIS_PORT=${REDIS_PORT:-6379}
 
 do_test() {
   echo "$(tput bold)Testing pairs: $(tput setaf 3)$1$(tput setaf 4) <==> $(tput setaf 3)$2$(tput sgr0)"

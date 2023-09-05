@@ -2,11 +2,11 @@ import io
 
 
 class AsyncBytesIO:
-    '''
+    """
     An async wrapper for in-memory bytes stream.
-    '''
+    """
 
-    def __init__(self, initial_data: bytes = b'') -> None:
+    def __init__(self, initial_data: bytes = b"") -> None:
         self._buf = io.BytesIO(initial_data)
 
     async def open(self) -> None:

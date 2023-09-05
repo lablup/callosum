@@ -1,24 +1,15 @@
 from __future__ import annotations
 
 import abc
-from typing import (
-    Any,
-    AsyncGenerator,
-    ClassVar,
-    Mapping,
-    Optional,
-    Type,
-)
+from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 
 from ..abc import RawHeaderBody
 from ..auth import AbstractAuthenticator
 
 
 class AbstractMessagingMixin(metaclass=abc.ABCMeta):
-
     @abc.abstractmethod
-    async def recv_message(self) -> AsyncGenerator[
-            Optional[RawHeaderBody], None]:
+    async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
         yield None
 
     @abc.abstractmethod
@@ -31,23 +22,23 @@ class AbstractAddress:
 
 
 class AbstractStreamingMixin(metaclass=abc.ABCMeta):
-
     # TODO: define
     pass
 
 
-class AbstractConnection(AbstractMessagingMixin, AbstractStreamingMixin,
-                         metaclass=abc.ABCMeta):
-    '''
+class AbstractConnection(
+    AbstractMessagingMixin, AbstractStreamingMixin, metaclass=abc.ABCMeta
+):
+    """
     An abstract interface for communication operations, except its lifecycle
     management operations which are responsible to binder and connector.
-    '''
+    """
+
     pass
 
 
 class AbstractBinder(metaclass=abc.ABCMeta):
-
-    __slots__ = ('transport', 'addr')
+    __slots__ = ("transport", "addr")
 
     def __init__(
         self,
@@ -60,22 +51,21 @@ class AbstractBinder(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def __aenter__(self) -> AbstractConnection:
-        '''
+        """
         Create a listening connection bound on self.addr.
-        '''
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        '''
+        """
         Close the listening connection.
-        '''
+        """
         pass
 
 
 class AbstractConnector(metaclass=abc.ABCMeta):
-
-    __slots__ = ('transport', 'addr')
+    __slots__ = ("transport", "addr")
 
     def __init__(
         self,
@@ -88,36 +78,35 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def __aenter__(self) -> AbstractConnection:
-        '''
+        """
         Return a connection to self.addr.
-        '''
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
-        '''
+        """
         Close/release the connection.
-        '''
+        """
         pass
 
 
 class BaseTransport(metaclass=abc.ABCMeta):
-
     binder_cls: ClassVar[Type[AbstractBinder]]
     connector_cls: ClassVar[Type[AbstractConnector]]
 
     __slots__ = (
-        'authenticator',
-        'transport_opts',
+        "authenticator",
+        "transport_opts",
     )
     authenticator: Optional[AbstractAuthenticator]
     transport_opts: Mapping[str, Any]
 
     def __init__(
         self,
-        authenticator: AbstractAuthenticator = None,
+        authenticator: Optional[AbstractAuthenticator] = None,
         *,
-        transport_opts: Mapping[str, Any] = None,
+        transport_opts: Optional[Mapping[str, Any]] = None,
         **kwargs,
     ) -> None:
         self.authenticator = authenticator
@@ -130,9 +119,9 @@ class BaseTransport(metaclass=abc.ABCMeta):
         return type(self).connector_cls(self, connect_addr, **self.transport_opts)
 
     async def close(self) -> None:
-        '''
+        """
         Close all open connections and release system resources.
         This may be left empty for transports without connection pooling or
         persistent connections.
-        '''
+        """
         pass

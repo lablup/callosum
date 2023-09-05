@@ -5,6 +5,7 @@ class RPCError(CallosumError):
     """
     A base exception for all RPC-specific errors.
     """
+
     pass
 
 

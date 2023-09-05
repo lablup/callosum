@@ -1,0 +1,125 @@
+name: default
+
+on: [push, pull_request]
+
+jobs:
+
+  test-unit:
+
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 4s
+          --health-timeout 2s
+          --health-retries 5
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.4"
+        cache: pip
+        cache-dependency-path: |
+          setup.py
+          requirements/test.txt
+    - name: Install dependencies
+      run: |
+        sudo apt install -y libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
+    - name: Run unit tests
+      env:
+        REDIS_HOST: localhost
+        REDIS_PORT: ${{ job.services.redis.ports[6379] }}
+      run: |
+        python -m pytest --cov tests
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+
+  test-integration:
+
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 4s
+          --health-timeout 2s
+          --health-retries 5
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.4"
+        cache: pip
+        cache-dependency-path: |
+          setup.py
+          requirements/test.txt
+    - name: Install dependencies
+      run: |
+        sudo apt install -y libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
+    - name: Run integration tests
+      env:
+        REDIS_HOST: localhost
+        REDIS_PORT: ${{ job.services.redis.ports[6379] }}
+      run: |
+        ./scripts/run-integration-tests.sh
+
+  deploy-to-pypi:
+    needs: [test-unit, test-integration]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.4"
+        cache: pip
+        cache-dependency-path: |
+          setup.py
+          requirements/build.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -r requirements/build.txt
+    - name: Build packages
+      run: |
+        python setup.py sdist bdist_wheel
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
+          dist/*.tar.gz
+          dist/*.whl

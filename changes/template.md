@@ -1,12 +1,18 @@
+{%- if top_line -%}
+{{ top_line }}
+{%- elif versiondata.name -%}
+{{ versiondata.name }} {{ versiondata.version }} ({{ versiondata.date }})
+{%- else -%}
+{{ versiondata.version }} ({{ versiondata.date }})
+{%- endif -%}
 {%- for section, _ in sections.items() -%}
-  {%- if section %}
-### {{ section }}
-  {%- endif -%}
+  {%- if section -%}
+### {{ section }}{%- endif -%}
   {%- if sections[section] -%}
     {%- for category, val in definitions.items() if category in sections[section] %}
 
 
-#### {{ definitions[category]['name'] }}
+### {{ definitions[category]['name'] }}
 
       {%- if definitions[category]['showcontent'] %}
         {%- for text, values in sections[section][category].items() %}
