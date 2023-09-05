@@ -111,7 +111,7 @@ setup(
         "callosum": ["py.typed"],
     },
     include_package_data=True,
-    python_requires=">=3.8",
+    python_requires=">=3.11",
     setup_requires=["setuptools>=61.0"],
     install_requires=install_requires,
     extras_require={

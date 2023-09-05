@@ -22,5 +22,6 @@ repos:
   - id: mypy
     additional_dependencies: [
       'types-python-dateutil',
+      'types-redis',
       'attrs>=21.3',
     ]

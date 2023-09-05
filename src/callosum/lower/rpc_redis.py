@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
 
-import aioredis
 import attrs
+import redis
+import redis.asyncio
 
 from ..abc import RawHeaderBody
 from . import (
@@ -42,7 +43,9 @@ class RPCRedisConnection(AbstractConnection):
         self.direction_keys = direction_keys
 
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
-        # assert not self.transport._redis.closed
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
+        assert self.transport._redis is not None
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
@@ -57,11 +60,10 @@ class RPCRedisConnection(AbstractConnection):
 
         try:
             raw_msgs = await _s(
-                self.transport._redis.xread_group(
+                self.transport._redis.xreadgroup(
                     self.addr.group,
                     self.addr.consumer,
-                    [stream_key],
-                    latest_ids=[">"],
+                    {stream_key: ">"},
                 )
             )
             for raw_msg in raw_msgs:
@@ -73,11 +75,11 @@ class RPCRedisConnection(AbstractConnection):
                 await _s(_xack(raw_msg))
         except asyncio.CancelledError:
             raise
-        except aioredis.errors.ConnectionForcedCloseError:
+        except redis.asyncio.ConnectionError:
             yield None
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
-        # assert not self.transport._redis.closed
+        assert self.transport._redis is not None
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
@@ -94,6 +96,16 @@ class RPCRedisConnection(AbstractConnection):
         )
 
 
+def _addr_to_url(value: str | tuple[str, int], *, scheme: str = "redis") -> str:
+    match value:
+        case str():
+            return f"{scheme}://{value}"
+        case (host, port):
+            return f"{scheme}://{host}:{port}"
+        case _:
+            raise ValueError("unrecognized address format", value)
+
+
 class RPCRedisBinder(AbstractBinder):
     """
     This class is binder for RPCRedisTransport.
@@ -104,30 +116,38 @@ class RPCRedisBinder(AbstractBinder):
     the connection.
     """
 
-    __slots__ = ("transport", "addr")
+    __slots__ = ("transport", "addr", "_addr_url")
 
     transport: RPCRedisTransport
     addr: RedisStreamAddress
+    _addr_url: str
 
     async def __aenter__(self):
-        self.transport._redis = await aioredis.create_redis(
-            self.addr.redis_server, **self.transport._redis_opts
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
+        self._addr_url = _addr_to_url(self.addr.redis_server)
+        self.transport._redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
         key = f"{self.addr.stream_key}.bind"
         await self.transport._redis.xadd(key, {b"meta": b"create-stream"})
         groups = await self.transport._redis.xinfo_groups(key)
         if not any(map(lambda g: g[b"name"] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
-                key, self.addr.group
-            )  # TODO: mkstream=True in future aioredis
+                key,
+                self.addr.group,
+                mkstream=True,
+            )
         return RPCRedisConnection(self.transport, self.addr, ("bind", "conn"))
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
         # we need to create a new Redis connection for cleanup
         # because self.transport._redis gets corrupted upon
         # cancellation of Peer._recv_loop() task.
-        _redis = await aioredis.create_redis(
-            self.addr.redis_server, **self.transport._redis_opts
+        _redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
         try:
             await asyncio.shield(
@@ -138,8 +158,7 @@ class RPCRedisBinder(AbstractBinder):
                 )
             )
         finally:
-            _redis.close()
-            await _redis.wait_closed()
+            await _redis.close()
 
 
 class RPCRedisConnector(AbstractConnector):
@@ -152,31 +171,37 @@ class RPCRedisConnector(AbstractConnector):
     the connection.
     """
 
-    __slots__ = ("transport", "addr")
+    __slots__ = ("transport", "addr", "_addr_url")
 
     transport: RPCRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
-        pool = await aioredis.create_connection(
-            self.addr.redis_server, **self.transport._redis_opts
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
+        self._addr_url = _addr_to_url(self.addr.redis_server)
+        self.transport._redis = redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
-        self.transport._redis = aioredis.Redis(pool)
         key = f"{self.addr.stream_key}.conn"
         await self.transport._redis.xadd(key, {b"meta": b"create-stream"})
         groups = await self.transport._redis.xinfo_groups(key)
         if not any(map(lambda g: g[b"name"] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
-                key, self.addr.group
-            )  # TODO: mkstream=True in future aioredis
+                key,
+                self.addr.group,
+                mkstream=True,
+            )
         return RPCRedisConnection(self.transport, self.addr, ("conn", "bind"))
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
         # we need to create a new Redis connection for cleanup
         # because self.transport._redis gets corrupted upon
         # cancellation of Peer._recv_loop() task.
-        _redis = await aioredis.create_redis(
-            self.addr.redis_server, **self.transport._redis_opts
+        _redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
         try:
             await asyncio.shield(
@@ -187,8 +212,7 @@ class RPCRedisConnector(AbstractConnector):
                 )
             )
         finally:
-            _redis.close()
-            await _redis.wait_closed()
+            await _redis.close()
 
 
 class RPCRedisTransport(BaseTransport):
@@ -203,7 +227,7 @@ class RPCRedisTransport(BaseTransport):
     )
 
     _redis_opts: Mapping[str, Any]
-    _redis: aioredis.RedisConnection
+    _redis: Optional[redis.asyncio.Redis]
 
     binder_cls = RPCRedisBinder
     connector_cls = RPCRedisConnector
@@ -218,6 +242,5 @@ class RPCRedisTransport(BaseTransport):
         self._redis = None
 
     async def close(self) -> None:
-        if self._redis is not None and not self._redis.closed:
-            self._redis.close()
-            await self._redis.wait_closed()
+        if self._redis is not None:
+            await self._redis.close()
