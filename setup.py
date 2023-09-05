@@ -68,7 +68,7 @@ zmq_requires = [
     "pyzmq>=23.0.0",
 ]
 
-redis_requires = ["redis-py>=4.6.0"]
+redis_requires = ["redis>=4.6.0"]
 
 snappy_requires = [
     "python-snappy>=0.6.1",
