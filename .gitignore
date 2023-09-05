@@ -99,3 +99,4 @@ ENV/
 
 # etc
 .DS_Store
+.*rc
