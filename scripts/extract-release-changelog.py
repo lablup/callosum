@@ -60,12 +60,14 @@ def main():
         if m is not None:
             content = m.group(1).strip()
             content += (
-                "\n\n### Full Changelog\n\nCheck out [the full changelog](%s) until this release (%s).\n"
-                % (changelog_url, tag)
+                f"\n\n### Full Changelog"
+                f"\n\nCheck out [the full changelog]({changelog_url}) "
+                f"until this release ({tag}).\n"
             )
             content += (
-                "\n\n### Full Commit Logs\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
-                % (commitlog_url, prev_tag, tag)
+                f"\n\n### Full Commit Logs"
+                f"\n\nCheck out [the full commit logs]({commitlog_url}) "
+                f"between release ({prev_tag}) and ({tag}).\n"
             )
             if not args.draft:
                 output_path.write_text(content)
