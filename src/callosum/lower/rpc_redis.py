@@ -47,6 +47,7 @@ class RPCRedisConnection(AbstractConnection):
             stream_key = self.addr.stream_key
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[0]}"
+
         # _s = asyncio.shield
         def _s(x):
             return x
@@ -83,9 +84,11 @@ class RPCRedisConnection(AbstractConnection):
             stream_key = self.addr.stream_key
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[1]}"
+
         # _s = asyncio.shield
         def _s(x):
             return x
+
         await _s(
             self.transport._redis.xadd(
                 stream_key, {b"hdr": raw_msg[0], b"msg": raw_msg[1]}
