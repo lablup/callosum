@@ -102,7 +102,6 @@ metadata_types = (
 
 @attrs.define(frozen=True, slots=True, auto_attribs=True)
 class RPCMessage(AbstractMessage):
-
     # transport-layer annotations
     peer_id: Optional[Any]
 

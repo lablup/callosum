@@ -9,14 +9,15 @@ import click
 from callosum.rpc import Peer
 from callosum.ordering import (
     AbstractAsyncScheduler,
-    ExitOrderedAsyncScheduler, KeySerializedAsyncScheduler,
+    ExitOrderedAsyncScheduler,
+    KeySerializedAsyncScheduler,
 )
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 
 scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
-    'key-serialized': KeySerializedAsyncScheduler,
-    'exit-ordered': ExitOrderedAsyncScheduler,
+    "key-serialized": KeySerializedAsyncScheduler,
+    "exit-ordered": ExitOrderedAsyncScheduler,
 }
 
 last_snapshot = None
@@ -28,7 +29,7 @@ async def handle_echo(request):
     if show_output:
         print("handle_echo()")
     return {
-        'received': request.body['sent'],
+        "received": request.body["sent"],
     }
 
 
@@ -36,39 +37,43 @@ async def handle_add(request):
     if show_output:
         print("handle_add()")
     return {
-        'result': request.body['a'] + request.body['b'],
+        "result": request.body["a"] + request.body["b"],
     }
 
 
 async def handle_output(request):
     global show_output
-    show_output = request.body['enabled']
+    show_output = request.body["enabled"]
 
 
 async def handle_show_memory_stat(request):
     global last_snapshot, scheduler
-    last_snapshot = last_snapshot.filter_traces((
-        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-        tracemalloc.Filter(False, tracemalloc.__file__),
-    ))
-    new_snapshot = tracemalloc.take_snapshot().filter_traces((
-        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-        tracemalloc.Filter(False, tracemalloc.__file__),
-    ))
-    top_stats = new_snapshot.compare_to(last_snapshot, 'lineno')
+    last_snapshot = last_snapshot.filter_traces(
+        (
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, tracemalloc.__file__),
+        )
+    )
+    new_snapshot = tracemalloc.take_snapshot().filter_traces(
+        (
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, tracemalloc.__file__),
+        )
+    )
+    top_stats = new_snapshot.compare_to(last_snapshot, "lineno")
     last_snapshot = new_snapshot
     print("[ Top 10 differences ]")
     for stat in top_stats[:10]:
         print(stat)
     print("[ Scheduler Queue Status ]")
     if isinstance(scheduler, KeySerializedAsyncScheduler):
-        print('_tasks', len(scheduler._tasks))
-        print('_futures', len(scheduler._futures))
-        if hasattr(scheduler, '_pending'):
-            print('_pending', len(scheduler._pending))
+        print("_tasks", len(scheduler._tasks))
+        print("_futures", len(scheduler._futures))
+        if hasattr(scheduler, "_pending"):
+            print("_pending", len(scheduler._pending))
             print(scheduler._pending)
     elif isinstance(scheduler, ExitOrderedAsyncScheduler):
-        print('_tasks', len(scheduler._tasks))
+        print("_tasks", len(scheduler._tasks))
 
 
 async def handle_long_delay(request):
@@ -77,7 +82,7 @@ async def handle_long_delay(request):
     try:
         await asyncio.sleep(5)
         return {
-            'received': request.body['sent'],
+            "received": request.body["sent"],
         }
     except asyncio.CancelledError:
         if show_output:
@@ -95,7 +100,7 @@ async def handle_error(request):
     if show_output:
         print("handle_error()")
     await asyncio.sleep(0.1)
-    raise ZeroDivisionError('ooops')
+    raise ZeroDivisionError("ooops")
 
 
 async def serve(scheduler_type: str) -> None:
@@ -104,17 +109,18 @@ async def serve(scheduler_type: str) -> None:
     sched_cls = scheduler_types[scheduler_type]
     scheduler = sched_cls()
     peer = Peer(
-        bind=ZeroMQAddress('tcp://127.0.0.1:5020'),
+        bind=ZeroMQAddress("tcp://127.0.0.1:5020"),
         transport=ZeroMQRPCTransport,
         scheduler=scheduler,
-        serializer=lambda o: json.dumps(o).encode('utf8'),
-        deserializer=lambda b: json.loads(b))
-    peer.handle_function('echo', handle_echo)
-    peer.handle_function('add', handle_add)
-    peer.handle_function('long_delay', handle_long_delay)
-    peer.handle_function('error', handle_error)
-    peer.handle_function('set_output', handle_output)
-    peer.handle_function('memstat', handle_show_memory_stat)
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    peer.handle_function("echo", handle_echo)
+    peer.handle_function("add", handle_add)
+    peer.handle_function("long_delay", handle_long_delay)
+    peer.handle_function("error", handle_error)
+    peer.handle_function("set_output", handle_output)
+    peer.handle_function("memstat", handle_show_memory_stat)
 
     loop = asyncio.get_running_loop()
     forever = loop.create_future()
@@ -126,22 +132,24 @@ async def serve(scheduler_type: str) -> None:
         async with peer:
             last_snapshot = tracemalloc.take_snapshot()
             try:
-                print('server started')
+                print("server started")
                 await forever
             except asyncio.CancelledError:
                 pass
-        print('server terminated')
+        print("server terminated")
     finally:
         tracemalloc.stop()
 
 
 @click.command()
-@click.argument('scheduler_type',
-                default='exit-ordered',
-                type=click.Choice(scheduler_types.keys()))
+@click.argument(
+    "scheduler_type",
+    default="exit-ordered",
+    type=click.Choice(scheduler_types.keys()),
+)
 def main(scheduler_type):
     asyncio.run(serve(scheduler_type))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

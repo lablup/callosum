@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class ThriftServerAdaptor(BaseRPCServerAdaptor):
-
     __slots__ = BaseRPCServerAdaptor.__slots__ + (
         "_processor",
         "_protocol_cls",
@@ -64,7 +63,6 @@ class ThriftServerAdaptor(BaseRPCServerAdaptor):
 
 
 class ThriftClientAdaptor(BaseRPCClientAdaptor):
-
     __slots__ = BaseRPCClientAdaptor.__slots__ + (
         "_service",
         "_protocol_cls",

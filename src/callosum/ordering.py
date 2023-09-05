@@ -33,7 +33,6 @@ def _resolve_future(request_id, fut, result, log) -> None:
 
 
 class AsyncResolver:
-
     __slots__ = ("_log", "_futures")
 
     _futures: Dict[_SeqItem, asyncio.Future]
