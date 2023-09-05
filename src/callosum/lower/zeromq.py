@@ -199,7 +199,6 @@ async def init_authenticator(
 
 
 class ZeroMQRPCConnection(AbstractConnection):
-
     __slots__ = "transport"
 
     transport: ZeroMQRPCTransport
@@ -257,7 +256,6 @@ class ZeroMQRPCConnection(AbstractConnection):
 
 
 class ZeroMQMonitorMixin:
-
     addr: ZeroMQAddress
 
     _monitor_sock: Optional[zmq.asyncio.Socket]
@@ -288,7 +286,6 @@ class ZeroMQMonitorMixin:
 
 
 class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
-
     __slots__ = (
         "transport",
         "addr",
@@ -361,7 +358,6 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
 
 
 class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
-
     __slots__ = (
         "transport",
         "addr",
@@ -446,37 +442,31 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
 
 
 class ZeroMQRouterBinder(ZeroMQBaseBinder):
-
     socket_type: ClassVar[int] = zmq.ROUTER
     transport: ZeroMQRPCTransport
 
 
 class ZeroMQDealerConnector(ZeroMQBaseConnector):
-
     socket_type: ClassVar[int] = zmq.DEALER
     transport: ZeroMQRPCTransport
 
 
 class ZeroMQPushBinder(ZeroMQBaseBinder):
-
     socket_type: ClassVar[int] = zmq.PUSH
     transport: ZeroMQDistributorTransport
 
 
 class ZeroMQPullConnector(ZeroMQBaseConnector):
-
     socket_type: ClassVar[int] = zmq.PULL
     transport: ZeroMQDistributorTransport
 
 
 class ZeroMQPubBinder(ZeroMQBaseBinder):
-
     socket_type: ClassVar[int] = zmq.PUB
     transport: ZeroMQBroadcastTransport
 
 
 class ZeroMQSubConnector(ZeroMQBaseConnector):
-
     socket_type: ClassVar[int] = zmq.SUB
     transport: ZeroMQBroadcastTransport
 
@@ -540,18 +530,15 @@ class ZeroMQBaseTransport(BaseTransport):
 
 
 class ZeroMQRPCTransport(ZeroMQBaseTransport):
-
     binder_cls = ZeroMQRouterBinder
     connector_cls = ZeroMQDealerConnector
 
 
 class ZeroMQDistributorTransport(ZeroMQBaseTransport):
-
     binder_cls = ZeroMQPushBinder
     connector_cls = ZeroMQPullConnector
 
 
 class ZeroMQBroadcastTransport(ZeroMQBaseTransport):
-
     binder_cls = ZeroMQPubBinder
     connector_cls = ZeroMQSubConnector

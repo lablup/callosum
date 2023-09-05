@@ -6,7 +6,6 @@ from ..rpc import Peer, RPCMessage
 
 
 class BaseRPCServerAdaptor:
-
     __slots__ = ("peer",)
 
     def __init__(self, peer: Peer):
@@ -24,7 +23,6 @@ class BaseRPCServerAdaptor:
 
 
 class BaseRPCClientAdaptor:
-
     __slots__ = ()
 
     def __init__(self):

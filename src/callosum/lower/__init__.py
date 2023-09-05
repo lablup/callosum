@@ -22,7 +22,6 @@ class AbstractAddress:
 
 
 class AbstractStreamingMixin(metaclass=abc.ABCMeta):
-
     # TODO: define
     pass
 
@@ -39,7 +38,6 @@ class AbstractConnection(
 
 
 class AbstractBinder(metaclass=abc.ABCMeta):
-
     __slots__ = ("transport", "addr")
 
     def __init__(
@@ -67,7 +65,6 @@ class AbstractBinder(metaclass=abc.ABCMeta):
 
 
 class AbstractConnector(metaclass=abc.ABCMeta):
-
     __slots__ = ("transport", "addr")
 
     def __init__(
@@ -95,7 +92,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
 
 class BaseTransport(metaclass=abc.ABCMeta):
-
     binder_cls: ClassVar[Type[AbstractBinder]]
     connector_cls: ClassVar[Type[AbstractConnector]]
 

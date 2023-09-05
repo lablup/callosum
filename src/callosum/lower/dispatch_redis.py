@@ -31,7 +31,6 @@ class RedisStreamAddress(AbstractAddress):
 
 
 class DispatchRedisConnection(AbstractConnection):
-
     __slots__ = ("transport",)
 
     transport: DispatchRedisTransport
@@ -55,7 +54,8 @@ class DispatchRedisConnection(AbstractConnection):
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[0]}"
         # _s = asyncio.shield
-        _s = lambda x: x
+        def _s(x):
+            return x
 
         async def _xack(raw_msg):
             await self.transport._redis.xack(raw_msg[0], self.addr.group, raw_msg[1])
@@ -90,7 +90,8 @@ class DispatchRedisConnection(AbstractConnection):
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[1]}"
         # _s = asyncio.shield
-        _s = lambda x: x
+        def _s(x):
+            return x
         await _s(
             self.transport._redis.xadd(
                 stream_key, {b"hdr": raw_msg[0], b"msg": raw_msg[1]}
