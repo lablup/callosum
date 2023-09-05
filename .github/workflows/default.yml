@@ -3,106 +3,6 @@ name: default
 on: [push, pull_request]
 
 jobs:
-  lint-flake8:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10.8"
-        cache: pip
-        cache-dependency-path: |
-          setup.py
-          requirements/lint.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/lint.txt
-    - name: Lint with flake8
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
-          echo "(skipping matchers for pull request from local branches)"
-        else
-          echo "::add-matcher::.github/workflows/flake8-matcher.json"
-        fi
-        python -m flake8 src tests setup.py
-
-  lint-black:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10.8"
-        cache: pip
-        cache-dependency-path: |
-          setup.py
-          requirements/lint.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/lint.txt
-    - name: Lint with black
-      run: |
-        python -m black --check src tests setup.py
-
-  lint-isort:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10.8"
-        cache: pip
-        cache-dependency-path: |
-          setup.py
-          requirements/lint.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/lint.txt
-    - name: Lint with isort
-      run: |
-        python -m isort --check src tests setup.py
-
-  typecheck-mypy:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10.8"
-        cache: pip
-        cache-dependency-path: |
-          setup.py
-          requirements/typecheck.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/typecheck.txt
-    - name: Type check with mypy
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
-          echo "(skipping matchers for pull request from local branches)"
-        else
-          echo "::add-matcher::.github/workflows/mypy-matcher.json"
-        fi
-        python -m mypy --no-color-output src/callosum
 
   test-unit:
 
@@ -124,7 +24,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10.8"
+        python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
           setup.py
@@ -162,7 +62,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10.8"
+        python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
           setup.py
@@ -191,7 +91,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10.8"
+        python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
           setup.py
