@@ -79,7 +79,7 @@ jobs:
         ./scripts/run-integration-tests.sh
 
   deploy-to-pypi:
-    needs: [lint-flake8, lint-black, lint-isort, typecheck-mypy, test-unit, test-integration]
+    needs: [test-unit, test-integration]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
