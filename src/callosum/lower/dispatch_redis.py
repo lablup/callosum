@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
 
-import aioredis
 import attrs
+import redis
+import redis.asyncio
 
 from ..abc import RawHeaderBody
 from ..exceptions import InvalidAddressError
@@ -15,6 +16,7 @@ from . import (
     AbstractConnector,
     BaseTransport,
 )
+from .redis_common import redis_addr_to_url
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -48,7 +50,9 @@ class DispatchRedisConnection(AbstractConnection):
         self.direction_keys = direction_keys
 
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
-        # assert not self.transport._redis.closed
+        assert self.transport._redis is not None
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
@@ -63,11 +67,10 @@ class DispatchRedisConnection(AbstractConnection):
 
         try:
             raw_msgs = await _s(
-                self.transport._redis.xread_group(
+                self.transport._redis.xreadgroup(
                     self.addr.group,
                     self.addr.consumer,
-                    [stream_key],
-                    latest_ids=[">"],
+                    {stream_key: ">"},
                 )
             )
             for raw_msg in raw_msgs:
@@ -79,11 +82,11 @@ class DispatchRedisConnection(AbstractConnection):
                 await _s(_xack(raw_msg))
         except asyncio.CancelledError:
             raise
-        except aioredis.errors.ConnectionForcedCloseError:
+        except redis.asyncio.ConnectionError:
             yield None
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
-        # assert not self.transport._redis.closed
+        assert self.transport._redis is not None
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
@@ -109,14 +112,15 @@ class DispatchRedisBinder(AbstractBinder):
     who read messages from the stream (Consumers).
     """
 
-    __slots__ = ("transport", "addr")
+    __slots__ = ("transport", "addr", "_addr_url")
 
     transport: DispatchRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
-        self.transport._redis = await aioredis.create_redis(
-            self.addr.redis_server, **self.transport._redis_opts
+        self._addr_url = redis_addr_to_url(self.addr.redis_server)
+        self.transport._redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
         key = self.addr.stream_key
         # If there were no stream with the specified key before,
@@ -143,16 +147,18 @@ class DispatchRedisConnector(AbstractConnector):
     that each consumer from the group gets distinct set of messages.
     """
 
-    __slots__ = ("transport", "addr")
+    __slots__ = ("transport", "addr", "_addr_url")
 
     transport: DispatchRedisTransport
     addr: RedisStreamAddress
 
     async def __aenter__(self):
-        pool = await aioredis.create_connection(
-            self.addr.redis_server, **self.transport._redis_opts
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
+        self._addr_url = redis_addr_to_url(self.addr.redis_server)
+        self.transport._redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
-        self.transport._redis = aioredis.Redis(pool)
         key = self.addr.stream_key
         # If there were no stream with the specified key before,
         # it is created as a side effect of adding the message.
@@ -163,11 +169,13 @@ class DispatchRedisConnector(AbstractConnector):
         return DispatchRedisConnection(self.transport, self.addr)
 
     async def __aexit__(self, exc_type, exc_obj, exc_tb):
+        assert self.addr.group is not None
+        assert self.addr.consumer is not None
         # we need to create a new Redis connection for cleanup
         # because self.transport._redis gets corrupted upon
         # cancellation of Peer._recv_loop() task.
-        _redis = await aioredis.create_redis(
-            self.addr.redis_server, **self.transport._redis_opts
+        _redis = await redis.asyncio.from_url(
+            self._addr_url, **self.transport._redis_opts
         )
         try:
             await asyncio.shield(
@@ -176,8 +184,7 @@ class DispatchRedisConnector(AbstractConnector):
                 )
             )
         finally:
-            _redis.close()
-            await _redis.wait_closed()
+            await _redis.close()
 
 
 class DispatchRedisTransport(BaseTransport):
@@ -192,7 +199,7 @@ class DispatchRedisTransport(BaseTransport):
     )
 
     _redis_opts: Mapping[str, Any]
-    _redis: aioredis.RedisConnection
+    _redis: Optional[redis.asyncio.Redis]
 
     binder_cls = DispatchRedisBinder
     connector_cls = DispatchRedisConnector
@@ -207,6 +214,5 @@ class DispatchRedisTransport(BaseTransport):
         self._redis = None
 
     async def close(self) -> None:
-        if self._redis is not None and not self._redis.closed:
-            self._redis.close()
-            await self._redis.wait_closed()
+        if self._redis is not None:
+            await self._redis.close()

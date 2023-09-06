@@ -15,6 +15,7 @@ from . import (
     AbstractConnector,
     BaseTransport,
 )
+from .redis_common import redis_addr_to_url
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -43,9 +44,9 @@ class RPCRedisConnection(AbstractConnection):
         self.direction_keys = direction_keys
 
     async def recv_message(self) -> AsyncGenerator[Optional[RawHeaderBody], None]:
+        assert self.transport._redis is not None
         assert self.addr.group is not None
         assert self.addr.consumer is not None
-        assert self.transport._redis is not None
         if not self.direction_keys:
             stream_key = self.addr.stream_key
         else:
@@ -96,16 +97,6 @@ class RPCRedisConnection(AbstractConnection):
         )
 
 
-def _addr_to_url(value: str | tuple[str, int], *, scheme: str = "redis") -> str:
-    match value:
-        case str():
-            return f"{scheme}://{value}"
-        case (host, port):
-            return f"{scheme}://{host}:{port}"
-        case _:
-            raise ValueError("unrecognized address format", value)
-
-
 class RPCRedisBinder(AbstractBinder):
     """
     This class is binder for RPCRedisTransport.
@@ -125,7 +116,7 @@ class RPCRedisBinder(AbstractBinder):
     async def __aenter__(self):
         assert self.addr.group is not None
         assert self.addr.consumer is not None
-        self._addr_url = _addr_to_url(self.addr.redis_server)
+        self._addr_url = redis_addr_to_url(self.addr.redis_server)
         self.transport._redis = await redis.asyncio.from_url(
             self._addr_url, **self.transport._redis_opts
         )
@@ -179,7 +170,7 @@ class RPCRedisConnector(AbstractConnector):
     async def __aenter__(self):
         assert self.addr.group is not None
         assert self.addr.consumer is not None
-        self._addr_url = _addr_to_url(self.addr.redis_server)
+        self._addr_url = redis_addr_to_url(self.addr.redis_server)
         self.transport._redis = redis.asyncio.from_url(
             self._addr_url, **self.transport._redis_opts
         )
