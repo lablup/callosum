@@ -3,7 +3,6 @@ import io
 import logging
 from typing import Any, Optional, Sequence
 
-import async_timeout
 from thriftpy2.contrib.aio.processor import TAsyncProcessor
 from thriftpy2.contrib.aio.protocol.binary import TAsyncBinaryProtocol
 from thriftpy2.thrift import TApplicationException, TMessageType, args_to_kwargs
@@ -37,7 +36,7 @@ class ThriftServerAdaptor(BaseRPCServerAdaptor):
         iproto = self._protocol_cls(reader_trans)
         oproto = self._protocol_cls(writer_trans)
         try:
-            with async_timeout.timeout(self._exec_timeout):
+            async with asyncio.timeout(self._exec_timeout):
                 await self._processor.process(iproto, oproto)
         except (asyncio.IncompleteReadError, ConnectionError):
             logger.debug("client has closed the connection")
