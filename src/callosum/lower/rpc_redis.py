@@ -52,28 +52,33 @@ class RPCRedisConnection(AbstractConnection):
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[0]}"
 
-        # _s = asyncio.shield
-        def _s(x):
-            return x
-
-        async def _xack(raw_msg):
-            await self.transport._redis.xack(raw_msg[0], self.addr.group, raw_msg[1])
-
         try:
-            raw_msgs = await _s(
-                self.transport._redis.xreadgroup(
+            per_key_fetch_list: list[Any] = []
+            while not per_key_fetch_list:
+                per_key_fetch_list = await self.transport._redis.xreadgroup(
                     self.addr.group,
                     self.addr.consumer,
                     {stream_key: ">"},
+                    block=1000,
                 )
-            )
-            for raw_msg in raw_msgs:
-                # [0]: stream key, [1]: item ID
-                if b"meta" in raw_msg[2]:
-                    await _s(_xack(raw_msg))
+            for fetch_info in per_key_fetch_list:
+                if fetch_info[0].decode() != stream_key:
                     continue
-                yield RawHeaderBody(raw_msg[2][b"hdr"], raw_msg[2][b"msg"], None)
-                await _s(_xack(raw_msg))
+                for item in fetch_info[1]:
+                    item_id: bytes = item[0]
+                    item_data: dict[bytes, bytes] = item[1]
+                    try:
+                        if b"meta" in item_data:
+                            continue
+                        yield RawHeaderBody(
+                            item_data[b"hdr"],
+                            item_data[b"msg"],
+                            None,
+                        )
+                    finally:
+                        await self.transport._redis.xack(
+                            stream_key, self.addr.group, item_id
+                        )
         except asyncio.CancelledError:
             raise
         except redis.asyncio.ConnectionError:
@@ -85,15 +90,8 @@ class RPCRedisConnection(AbstractConnection):
             stream_key = self.addr.stream_key
         else:
             stream_key = f"{self.addr.stream_key}.{self.direction_keys[1]}"
-
-        # _s = asyncio.shield
-        def _s(x):
-            return x
-
-        await _s(
-            self.transport._redis.xadd(
-                stream_key, {b"hdr": raw_msg[0], b"msg": raw_msg[1]}
-            )
+        await self.transport._redis.xadd(
+            stream_key, {b"hdr": raw_msg[0], b"msg": raw_msg[1]}
         )
 
 
@@ -123,7 +121,8 @@ class RPCRedisBinder(AbstractBinder):
         key = f"{self.addr.stream_key}.bind"
         await self.transport._redis.xadd(key, {b"meta": b"create-stream"})
         groups = await self.transport._redis.xinfo_groups(key)
-        if not any(map(lambda g: g[b"name"] == self.addr.group.encode(), groups)):
+        print(groups)
+        if not any(map(lambda g: g["name"] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key,
                 self.addr.group,
@@ -177,7 +176,7 @@ class RPCRedisConnector(AbstractConnector):
         key = f"{self.addr.stream_key}.conn"
         await self.transport._redis.xadd(key, {b"meta": b"create-stream"})
         groups = await self.transport._redis.xinfo_groups(key)
-        if not any(map(lambda g: g[b"name"] == self.addr.group.encode(), groups)):
+        if not any(map(lambda g: g["name"] == self.addr.group.encode(), groups)):
             await self.transport._redis.xgroup_create(
                 key,
                 self.addr.group,
