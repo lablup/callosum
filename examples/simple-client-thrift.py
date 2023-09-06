@@ -5,14 +5,11 @@ import secrets
 import sys
 import textwrap
 
-from async_timeout import timeout
-
-from callosum.rpc import Peer, RPCUserError
-from callosum.serialize import noop_serializer, noop_deserializer
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-from callosum.upper.thrift import ThriftClientAdaptor
 import thriftpy2 as thriftpy
-
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer, RPCUserError
+from callosum.serialize import noop_deserializer, noop_serializer
+from callosum.upper.thrift import ThriftClientAdaptor
 
 simple_thrift = thriftpy.load(
     str(pathlib.Path(__file__).parent / "simple.thrift"), module_name="simple_thrift"
@@ -47,7 +44,7 @@ async def call() -> None:
             print(textwrap.indent(e.traceback, prefix="| "))
 
         try:
-            with timeout(0.5):
+            async with asyncio.timeout(0.5):
                 await peer.invoke("simple", adaptor.long_delay())
         except asyncio.TimeoutError:
             print(
