@@ -1,16 +1,14 @@
 import asyncio
 import json
-import random
 import os
+import random
 import secrets
 import sys
 import textwrap
 import traceback
 
-from async_timeout import timeout
-
-from callosum.rpc import Peer, RPCUserError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer, RPCUserError
 
 
 async def test_simple(peer, initial_delay: float = 0):
@@ -41,7 +39,7 @@ async def test_simple(peer, initial_delay: float = 0):
 
 async def test_timeout(peer):
     try:
-        with timeout(0.5):
+        async with asyncio.timeout(0.5):
             await peer.invoke(
                 "long_delay",
                 {
