@@ -1,3 +1,6 @@
+import yarl
+
+
 def redis_addr_to_url(
     value: str | tuple[str, int],
     *,
@@ -5,7 +8,10 @@ def redis_addr_to_url(
 ) -> str:
     match value:
         case str():
-            return f"{scheme}://{value}"
+            url = yarl.URL(value)
+            if url.scheme is None:
+                return str(yarl.URL(value).with_scheme(scheme))
+            return value
         case (host, port):
             return f"{scheme}://{host}:{port}"
         case _:

@@ -16,12 +16,12 @@ def read_src_version():
 
 
 install_requires = [
-    "aiotools>=1.5.9",
-    "async_timeout>=3.0.1",
+    "aiotools>=1.7.0",
     "attrs>=21.3.0",
     "python-dateutil>=2.8.2",
     "msgpack>=1.0.4",
     "temporenc>=0.1",
+    "yarl>=1.8.2",
 ]
 
 build_requires = [
