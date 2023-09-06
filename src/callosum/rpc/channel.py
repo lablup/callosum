@@ -18,7 +18,6 @@ from typing import (
 
 import attrs
 from aiotools import aclosing
-from async_timeout import timeout
 
 from ..abc import (
     AbstractChannel,
@@ -328,7 +327,7 @@ class Peer(AbstractChannel):
         try:
             request: RPCMessage
             server_cancelled = False
-            async with timeout(invoke_timeout):
+            async with asyncio.timeout(invoke_timeout):
                 if callable(body):
                     # The user is using an upper-layer adaptor.
                     async with aclosing(body()) as agen:

@@ -16,12 +16,12 @@ def read_src_version():
 
 
 install_requires = [
-    "aiotools>=1.5.9",
-    "async_timeout>=3.0.1",
+    "aiotools>=1.7.0",
     "attrs>=21.3.0",
     "python-dateutil>=2.8.2",
     "msgpack>=1.0.4",
     "temporenc>=0.1",
+    "yarl>=1.8.2",
 ]
 
 build_requires = [
@@ -45,13 +45,13 @@ dev_requires: List[str] = [
 ]
 
 lint_requires = [
-    "flake8>=5.0.4",
-    "isort>=5.10.1",
-    "black>=22.10.0",
+    "black>=23.7.0",
+    "ruff>=0.0.287",
+    "ruff-lsp",
 ]
 
 typecheck_requires = [
-    "mypy>=0.991",
+    "mypy>=1.5.1",
     "types-python-dateutil",
 ]
 
@@ -68,9 +68,7 @@ zmq_requires = [
     "pyzmq>=23.0.0",
 ]
 
-redis_requires = [
-    "aioredis>=1.3.0,<2.0",
-]
+redis_requires = ["redis>=4.6.0"]
 
 snappy_requires = [
     "python-snappy>=0.6.1",
@@ -111,7 +109,7 @@ setup(
         "callosum": ["py.typed"],
     },
     include_package_data=True,
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     setup_requires=["setuptools>=61.0"],
     install_requires=install_requires,
     extras_require={

@@ -6,8 +6,6 @@ import sys
 import textwrap
 
 import thriftpy2 as thriftpy
-from async_timeout import timeout
-
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 from callosum.serialize import noop_deserializer, noop_serializer
@@ -46,7 +44,7 @@ async def call() -> None:
             print(textwrap.indent(e.traceback, prefix="| "))
 
         try:
-            with timeout(0.5):
+            async with asyncio.timeout(0.5):
                 await peer.invoke("simple", adaptor.long_delay())
         except asyncio.TimeoutError:
             print(
