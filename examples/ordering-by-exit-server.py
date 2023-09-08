@@ -2,11 +2,11 @@ import asyncio
 import json
 import signal
 
-from callosum.rpc import Peer
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import (
     ExitOrderedAsyncScheduler,
 )
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer
 
 
 async def handle_echo(request):

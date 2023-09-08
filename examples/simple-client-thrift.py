@@ -6,6 +6,7 @@ import sys
 import textwrap
 
 import thriftpy2 as thriftpy
+
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 from callosum.serialize import noop_deserializer, noop_serializer

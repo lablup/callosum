@@ -2,12 +2,12 @@ import asyncio
 import pathlib
 import signal
 
-from callosum.rpc import Peer
-from callosum.serialize import noop_serializer, noop_deserializer
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-from callosum.upper.thrift import ThriftServerAdaptor
 import thriftpy2 as thriftpy
 
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer
+from callosum.serialize import noop_deserializer, noop_serializer
+from callosum.upper.thrift import ThriftServerAdaptor
 
 simple_thrift = thriftpy.load(
     str(pathlib.Path(__file__).parent / "simple.thrift"), module_name="simple_thrift"

@@ -10,12 +10,12 @@ import json
 import os
 import signal
 
+from callosum.lower.dispatch_redis import (
+    DispatchRedisTransport,
+    RedisStreamAddress,
+)
 from callosum.pubsub import (
     Consumer,
-)
-from callosum.lower.dispatch_redis import (
-    RedisStreamAddress,
-    DispatchRedisTransport,
 )
 
 

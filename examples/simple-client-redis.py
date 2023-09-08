@@ -4,11 +4,11 @@ import os
 import random
 import secrets
 
-from callosum.rpc import Peer
 from callosum.lower.rpc_redis import (
     RedisStreamAddress,
     RPCRedisTransport,
 )
+from callosum.rpc import Peer
 
 
 async def call():

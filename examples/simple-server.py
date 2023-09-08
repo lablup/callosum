@@ -6,14 +6,14 @@ import tracemalloc
 from typing import Mapping, Type
 
 import click
-from callosum.rpc import Peer
+
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import (
     AbstractAsyncScheduler,
     ExitOrderedAsyncScheduler,
     KeySerializedAsyncScheduler,
 )
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-
+from callosum.rpc import Peer
 
 scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
     "key-serialized": KeySerializedAsyncScheduler,

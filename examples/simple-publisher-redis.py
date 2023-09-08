@@ -9,12 +9,12 @@ import os
 import random
 import secrets
 
+from callosum.lower.dispatch_redis import (
+    DispatchRedisTransport,
+    RedisStreamAddress,
+)
 from callosum.pubsub import (
     Publisher,
-)
-from callosum.lower.dispatch_redis import (
-    RedisStreamAddress,
-    DispatchRedisTransport,
 )
 
 
