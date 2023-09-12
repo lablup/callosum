@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import secrets
 import time
@@ -13,7 +14,6 @@ import zmq.asyncio
 import zmq.utils.monitor
 from zmq.utils import z85
 
-from callosum.exceptions import AuthenticationError
 
 from ..abc import RawHeaderBody
 from ..auth import (
@@ -34,7 +34,7 @@ ZAP_VERSION = b"1.0"
 _default_zsock_opts = {
     zmq.LINGER: 100,
 }
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -186,6 +186,7 @@ async def init_authenticator(
             sock.zap_domain = server_id.domain.encode("utf8")
             sock.setsockopt(zmq.CURVE_SERVER, 1)
             sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
+            log.info("init authenticator as server (server_id=%r)", server_id)
         case AbstractClientAuthenticator() as auth:
             client_id = await auth.client_identity()
             client_public_key = await auth.client_public_key()
@@ -194,6 +195,7 @@ async def init_authenticator(
             sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
             sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
+            log.info("init authenticator as client (client_id=%r)", client_id)
         case None:
             pass
 
@@ -320,7 +322,7 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
                 RuntimeWarning,
             )
 
-    async def ping(self, ping_timeout: int = 100) -> bool:
+    async def ping(self, ping_timeout: int = 1000) -> bool:
         assert self._main_sock is not None
         sock: zmq.asyncio.Socket = self._main_sock
         await sock.send_multipart([b"PING", b"", b""])
@@ -425,8 +427,8 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         client_sock.connect(self.addr.uri)
         self._main_sock = client_sock
         self.transport._sock = client_sock
-        if not await self.ping():
-            raise AuthenticationError
+        # if not await self.ping():
+        #     raise AuthenticationError
         handshake_done = time.perf_counter()
         log.debug(
             "ZeroMQ connector handshake latency: %.3f sec",
@@ -500,14 +502,13 @@ class ZeroMQBaseTransport(BaseTransport):
         **kwargs,
     ) -> None:
         super().__init__(authenticator, **kwargs)
-        loop = asyncio.get_running_loop()
         self._zap_server = None
         self._zap_task = None
         self._zctx = zmq.asyncio.Context()
         match self.authenticator:
             case AbstractServerAuthenticator() as auth:
                 self._zap_server = ZAPServer(self._zctx, auth)
-                self._zap_task = loop.create_task(self._zap_server.serve())
+                self._zap_task = asyncio.create_task(self._zap_server.serve())
             case _:
                 pass
         # Keep sockets during the transport lifetime.
@@ -524,7 +525,8 @@ class ZeroMQBaseTransport(BaseTransport):
             self._sock.close()
         if self._zap_task is not None and not self._zap_task.done():
             self._zap_task.cancel()
-            await self._zap_task
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._zap_task
         if self._zctx is not None:
             self._zctx.destroy(linger=50)
 

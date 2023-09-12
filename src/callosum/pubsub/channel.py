@@ -24,7 +24,7 @@ from ..lower import (
 from .message import StreamMessage
 from .types import ConsumerCallback
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 class Publisher(AbstractChannel):

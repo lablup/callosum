@@ -47,7 +47,7 @@ from .types import RequestId
 if TYPE_CHECKING:
     from . import FunctionHandler
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 class Peer(AbstractChannel):
