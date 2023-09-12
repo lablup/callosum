@@ -112,7 +112,7 @@ async def serve(scheduler_type: str) -> None:
     peer = Peer(
         bind=ZeroMQAddress("tcp://127.0.0.1:5020"),
         transport=ZeroMQRPCTransport,
-        authenticator=None,
+        transport_opts={"attach_monitor": True},
         scheduler=scheduler,
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
@@ -156,7 +156,7 @@ def main(scheduler_type):
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        level=logging.INFO,
+        level=logging.DEBUG,
     )
     log = logging.getLogger()
     main()

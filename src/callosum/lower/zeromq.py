@@ -5,14 +5,16 @@ import contextlib
 import logging
 import secrets
 import time
-import warnings
 from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 
 import attrs
 import zmq
 import zmq.asyncio
+import zmq.constants
 import zmq.utils.monitor
 from zmq.utils import z85
+
+from callosum.exceptions import AuthenticationError
 
 from ..abc import RawHeaderBody
 from ..auth import (
@@ -261,21 +263,14 @@ class ZeroMQMonitorMixin:
 
     _monitor_sock: Optional[zmq.asyncio.Socket]
 
-    # FIXME: Upon release pyzmq 23.0 or 22.4, take the constant declarations
-    #        from the zmq.constants.Event enum class, instead of doing dir().
-    EVENT_MAP = {
-        getattr(zmq.constants, name): name[6:].replace("_", "-").lower()
-        for name in dir(zmq.constants)
-        if name.startswith("EVENT_")
-    }
-
     async def _monitor(self) -> None:
         assert self._monitor_sock is not None
         log = logging.getLogger("callosum.lower.zeromq.monitor")
         try:
-            while await self._monitor_sock.poll():
-                raw_msg = await self._monitor_sock.recv_multipart()
-                msg = zmq.utils.monitor.parse_monitor_message(raw_msg)
+            while True:
+                msg = await zmq.utils.monitor.recv_monitor_message(
+                    self._monitor_sock
+                )
                 log.debug("monitor[%s] event: %r", self.addr, msg)
                 if msg["event"] == zmq.EVENT_MONITOR_STOPPED:
                     break
@@ -314,12 +309,6 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
-        if attach_monitor:
-            warnings.warn(
-                "ZeroMQ async monitor socket support is buggy "
-                "and not recommended to use.",
-                RuntimeWarning,
-            )
 
     async def ping(self, ping_timeout: int = 1000) -> bool:
         assert self._main_sock is not None
@@ -340,9 +329,7 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
             server_sock.setsockopt(key, value)
         if self._attach_monitor:
             monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
-            server_sock.get_monitor_socket(addr=monitor_addr)
-            self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
-            self._monitor_sock.connect(monitor_addr)
+            self._monitor_sock = server_sock.get_monitor_socket(addr=monitor_addr)
             self._monitor_task = asyncio.create_task(self._monitor())
         else:
             self._monitor_sock = None
@@ -389,21 +376,13 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
-        if attach_monitor:
-            warnings.warn(
-                "ZeroMQ async monitor socket support is buggy "
-                "and not recommended to use.",
-                RuntimeWarning,
-            )
 
-    async def ping(self, ping_timeout: int = 100) -> bool:
+    async def ping(self, ping_timeout: int = 1000) -> bool:
         assert self._main_sock is not None
         sock: zmq.asyncio.Socket = self._main_sock
         await sock.send_multipart([b"PING", b"", b""])
-        ret = await sock.poll(ping_timeout)
-        if ret == 0:
-            return False
-        response = await sock.recv_multipart()
+        async with asyncio.timeout(ping_timeout / 1000):
+            response = await sock.recv_multipart()
         return response[0] == b"PONG"
 
     async def __aenter__(self) -> ZeroMQRPCConnection:
@@ -416,9 +395,7 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
             client_sock.setsockopt(key, value)
         if self._attach_monitor:
             monitor_addr = f"inproc://monitor-{secrets.token_hex(16)}"
-            client_sock.get_monitor_socket(addr=monitor_addr)
-            self._monitor_sock = self.transport._zctx.socket(zmq.PAIR)
-            self._monitor_sock.connect(monitor_addr)
+            self._monitor_sock = client_sock.get_monitor_socket(addr=monitor_addr)
             self._monitor_task = asyncio.create_task(self._monitor())
         else:
             self._monitor_sock = None
@@ -426,8 +403,10 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         client_sock.connect(self.addr.uri)
         self._main_sock = client_sock
         self.transport._sock = client_sock
-        # if not await self.ping():
-        #     raise AuthenticationError
+        try:
+            await self.ping()
+        except asyncio.TimeoutError:
+            raise AuthenticationError
         handshake_done = time.perf_counter()
         log.debug(
             "ZeroMQ connector handshake latency: %.3f sec",
@@ -435,11 +414,12 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         )
         return ZeroMQRPCConnection(self.transport)
 
-    async def __aexit__(self, exc_type, exc_obj, exc_tb):
+    async def __aexit__(self, exc_type, exc_obj, exc_tb) -> Optional[bool]:
         assert self._main_sock is not None
         if self._monitor_task is not None:
             self._main_sock.disable_monitor()
             await self._monitor_task
+        return None
 
 
 class ZeroMQRouterBinder(ZeroMQBaseBinder):

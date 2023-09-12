@@ -94,7 +94,7 @@ async def single_client() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
-        authenticator=None,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -110,6 +110,7 @@ async def overlapped_requests() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -135,7 +136,7 @@ async def multi_clients() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
-        authenticator=None,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -162,7 +163,7 @@ async def multi_clients() -> None:
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        level=logging.INFO,
+        level=logging.DEBUG,
     )
     log = logging.getLogger()
 
