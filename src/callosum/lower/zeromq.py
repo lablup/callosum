@@ -14,7 +14,6 @@ import zmq.asyncio
 import zmq.utils.monitor
 from zmq.utils import z85
 
-
 from ..abc import RawHeaderBody
 from ..auth import (
     AbstractClientAuthenticator,
