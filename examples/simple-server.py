@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import signal
 import sys
 import tracemalloc
@@ -153,4 +154,9 @@ def main(scheduler_type):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     main()

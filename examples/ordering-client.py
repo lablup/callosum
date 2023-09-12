@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer
@@ -38,4 +39,9 @@ async def call() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     asyncio.run(call())

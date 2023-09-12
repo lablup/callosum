@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import random
 import secrets
@@ -51,4 +52,9 @@ async def call():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     asyncio.run(call())
