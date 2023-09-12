@@ -15,7 +15,7 @@ hemispheres of a human brain.
 Prerequisite
 ------------
 
-Python 3.8 or higher.
+Python 3.11 or higher.
 
 Features
 --------
@@ -63,9 +63,11 @@ Please check out [the examples directory.](https://github.com/lablup/callosum/tr
 Development
 -----------
 
-Use the editable installation of Python setuptools.
+Create a virtual environment or an isolated Python environment using your favorite tool.
+
+Inside it, run editable installation as follows:
 
 ```console
 $ pip install -U pip setuptools
-$ pip install -U -e '.[dev,build,test,zeromq,redis,thrift,snappy]'
+$ pip install -U -r requirements/dev.txt
 ```
