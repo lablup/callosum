@@ -4,6 +4,44 @@ on: [push, pull_request]
 
 jobs:
 
+  pre-commit-check:
+
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.4"
+    - name: Cache pre-commit dependencies
+      id: cache_pre_commit
+      uses: actions/cache@v3
+      with:
+        path: |
+          .pre_commit_venv
+          ~/.cache/pre-commit
+        key: pre-commit-${{ hashFiles('.pre-commit-config.yaml','~/.cache/pre-commit/*') }}
+    - name: Install pre-commit
+      if: steps.cache_pre_commit.outputs.cache-hit != 'true'
+      run: |
+        python -m venv .pre_commit_venv
+        . .pre_commit_venv/bin/activate
+        pip install --upgrade pip
+        pip install pre-commit
+        pre-commit install --install-hooks
+        pre-commit gc
+    - name: Run pre-commit hooks
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        fi
+        . .pre_commit_venv/bin/activate
+        pre-commit run --color=always --all-files
+
   test-unit:
 
     runs-on: ubuntu-latest
@@ -81,7 +119,7 @@ jobs:
         ./scripts/run-integration-tests.sh
 
   build-distributions:
-    needs: [test-unit, test-integration]
+    needs: [pre-commit-check, test-unit, test-integration]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
