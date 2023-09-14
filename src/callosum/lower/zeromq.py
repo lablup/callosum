@@ -272,6 +272,7 @@ class ZeroMQMonitorMixin:
                     self._monitor_sock
                 )
                 log.debug("monitor[%s] event: %r", self.addr, msg)
+                # TODO: allow setting a custom callback
                 if msg["event"] == zmq.EVENT_MONITOR_STOPPED:
                     break
         except Exception:
