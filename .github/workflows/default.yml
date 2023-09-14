@@ -65,7 +65,7 @@ jobs:
         python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
-          setup.py
+          setup.cfg
           requirements/test.txt
     - name: Install dependencies
       run: |
@@ -104,7 +104,7 @@ jobs:
         python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
-          setup.py
+          setup.cfg
           requirements/test.txt
     - name: Install dependencies
       run: |
@@ -134,7 +134,7 @@ jobs:
         python-version: "3.11.4"
         cache: pip
         cache-dependency-path: |
-          setup.py
+          setup.cfg
           requirements/build.txt
     - name: Install dependencies
       run: |
@@ -142,7 +142,7 @@ jobs:
         python -m pip install -U -r requirements/build.txt
     - name: Build packages
       run: |
-        python setup.py sdist bdist_wheel
+        python -m build -s -w
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
