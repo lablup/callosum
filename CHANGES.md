@@ -13,7 +13,7 @@
     WARNING: Don't drop the last line!
 -->
 
-.. towncrier release notes start
+<!-- towncrier release notes start -->
 
 
 ## v0.9.10 (2022-02-17)
