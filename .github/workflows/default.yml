@@ -111,7 +111,7 @@ jobs:
         name: distributions
         path: dist
 
-  deploy-to-pypi:
+  publish:
     needs: [build-distributions]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
