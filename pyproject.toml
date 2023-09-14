@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# enables setuptools_scm to provide the dynamic version
+
 [tool.towncrier]
 package = "callosum"
 filename = "CHANGES.md"
@@ -58,3 +65,9 @@ split-on-trailing-comma = true
 
 [tool.black]
 line-length = 85
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.pytest]
+norecursedirs = ["venv*", "virtualenv*", ".git"]

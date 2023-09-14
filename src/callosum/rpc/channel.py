@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+from contextlib import aclosing
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,7 +18,6 @@ from typing import (
 )
 
 import attrs
-from aiotools import aclosing
 
 from ..abc import (
     AbstractChannel,
