@@ -165,6 +165,8 @@ jobs:
       id-token: write
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Download the build version
       uses: actions/download-artifact@v3
       with:
