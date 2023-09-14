@@ -1,1 +1,3 @@
-__version__ = "0.9.10"
+from importlib.metadata import version
+
+__version__ = version("callosum")

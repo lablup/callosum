@@ -3,9 +3,8 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+from contextlib import aclosing
 from typing import Any, List, Mapping, Optional, Type, Union
-
-from aiotools import aclosing
 
 from ..abc import (
     AbstractChannel,
