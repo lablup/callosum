@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import signal
-import sys
 import tracemalloc
 from typing import Mapping, Type
 
@@ -24,6 +23,8 @@ scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
 last_snapshot = None
 show_output = True
 scheduler = None
+
+log = logging.getLogger()
 
 
 async def handle_echo(request):
@@ -91,10 +92,6 @@ async def handle_long_delay(request):
         # NOTE: due to strange behaviour of asyncio, I have to reraise
         # otherwise, the task.cancelled() returns False
         raise
-    else:
-        if show_output:
-            print(" -> not cancelled!")
-        sys.exit(1)
 
 
 async def handle_error(request):
@@ -134,11 +131,11 @@ async def serve(scheduler_type: str) -> None:
         async with peer:
             last_snapshot = tracemalloc.take_snapshot()
             try:
-                print("server started")
+                log.info("server started")
                 await forever
             except asyncio.CancelledError:
                 pass
-        print("server terminated")
+        log.info("server terminated")
     finally:
         tracemalloc.stop()
 
@@ -156,7 +153,6 @@ def main(scheduler_type):
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        level=logging.DEBUG,
+        level=logging.INFO,
     )
-    log = logging.getLogger()
     main()

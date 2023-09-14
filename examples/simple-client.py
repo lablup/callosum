@@ -11,6 +11,8 @@ import traceback
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 
+log = logging.getLogger()
+
 
 async def test_simple(peer, initial_delay: float = 0):
     await asyncio.sleep(initial_delay)
@@ -163,9 +165,8 @@ async def multi_clients() -> None:
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        level=logging.DEBUG,
+        level=logging.INFO,
     )
-    log = logging.getLogger()
 
     print("==== Testing with a single client ====")
     asyncio.run(single_client())
