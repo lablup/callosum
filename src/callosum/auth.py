@@ -19,7 +19,13 @@ class Identity:
     private_key: bytes
 
 
-def create_keypair(self):
+@attrs.define(frozen=True, slots=True)
+class Credential:
+    domain: str
+    public_key: bytes
+
+
+def create_keypair():
     """
     Generate a new CURVE-25519 public-private keypair.
     """
@@ -29,7 +35,7 @@ def create_keypair(self):
     return public_key, private_key
 
 
-class AbstractAuthenticator(metaclass=abc.ABCMeta):
+class AbstractServerAuthenticator(metaclass=abc.ABCMeta):
     """
     Users of Callosum should subclass this to implement custom authentication.
 
@@ -40,8 +46,6 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
     application-level identity management scheme.
     """
 
-    # === Binder APIs ===
-
     @abc.abstractmethod
     async def server_identity(self) -> Identity:
         """
@@ -51,15 +55,23 @@ class AbstractAuthenticator(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def check_client(self, client_id: Identity) -> AuthResult:
+    async def check_client(self, creds: Credential) -> AuthResult:
         """
         Check if the given domain and client public key is a valid one or not.
         Only used by the binder.
         """
         raise NotImplementedError
 
-    # === Connector APIs ===
+    @abc.abstractmethod
+    async def server_public_key(self) -> bytes:
+        """
+        Return the public key of the server.
+        Only used by the connector.
+        """
+        raise NotImplementedError
 
+
+class AbstractClientAuthenticator(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def server_public_key(self) -> bytes:
         """

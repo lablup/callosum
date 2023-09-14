@@ -5,17 +5,13 @@ multiple publishers are distributed among the consumers.
 """
 import asyncio
 import json
+import logging
 import os
 import random
 import secrets
 
-from callosum.lower.dispatch_redis import (
-    DispatchRedisTransport,
-    RedisStreamAddress,
-)
-from callosum.pubsub import (
-    Publisher,
-)
+from callosum.lower.dispatch_redis import DispatchRedisTransport, RedisStreamAddress
+from callosum.pubsub import Publisher
 
 
 async def publish() -> None:
@@ -57,4 +53,9 @@ async def publish() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     asyncio.run(publish())

@@ -11,7 +11,7 @@ from ..io import AsyncBytesIO
 from ..rpc import Peer, RPCMessage
 from . import BaseRPCClientAdaptor, BaseRPCServerAdaptor
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 class ThriftServerAdaptor(BaseRPCServerAdaptor):

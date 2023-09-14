@@ -1,7 +1,7 @@
 import asyncio
 import json
+import logging
 import signal
-import sys
 import tracemalloc
 from typing import Mapping, Type
 
@@ -23,6 +23,8 @@ scheduler_types: Mapping[str, Type[AbstractAsyncScheduler]] = {
 last_snapshot = None
 show_output = True
 scheduler = None
+
+log = logging.getLogger()
 
 
 async def handle_echo(request):
@@ -90,10 +92,6 @@ async def handle_long_delay(request):
         # NOTE: due to strange behaviour of asyncio, I have to reraise
         # otherwise, the task.cancelled() returns False
         raise
-    else:
-        if show_output:
-            print(" -> not cancelled!")
-        sys.exit(1)
 
 
 async def handle_error(request):
@@ -111,6 +109,7 @@ async def serve(scheduler_type: str) -> None:
     peer = Peer(
         bind=ZeroMQAddress("tcp://127.0.0.1:5020"),
         transport=ZeroMQRPCTransport,
+        transport_opts={"attach_monitor": True},
         scheduler=scheduler,
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
@@ -132,11 +131,11 @@ async def serve(scheduler_type: str) -> None:
         async with peer:
             last_snapshot = tracemalloc.take_snapshot()
             try:
-                print("server started")
+                log.info("server started")
                 await forever
             except asyncio.CancelledError:
                 pass
-        print("server terminated")
+        log.info("server terminated")
     finally:
         tracemalloc.stop()
 
@@ -145,11 +144,15 @@ async def serve(scheduler_type: str) -> None:
 @click.argument(
     "scheduler_type",
     default="exit-ordered",
-    type=click.Choice(scheduler_types.keys()),
+    type=click.Choice([*scheduler_types.keys()]),
 )
 def main(scheduler_type):
     asyncio.run(serve(scheduler_type))
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
     main()

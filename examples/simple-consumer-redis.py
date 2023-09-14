@@ -7,16 +7,12 @@ which have not been obtained by others so far.
 """
 import asyncio
 import json
+import logging
 import os
 import signal
 
-from callosum.lower.dispatch_redis import (
-    DispatchRedisTransport,
-    RedisStreamAddress,
-)
-from callosum.pubsub import (
-    Consumer,
-)
+from callosum.lower.dispatch_redis import DispatchRedisTransport, RedisStreamAddress
+from callosum.pubsub import Consumer
 
 
 def handle_heartbeat(msg_body):
@@ -68,4 +64,9 @@ async def consume() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     asyncio.run(consume())

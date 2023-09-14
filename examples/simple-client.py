@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import random
 import secrets
@@ -9,6 +10,8 @@ import traceback
 
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
+
+log = logging.getLogger()
 
 
 async def test_simple(peer, initial_delay: float = 0):
@@ -93,6 +96,7 @@ async def single_client() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -108,6 +112,7 @@ async def overlapped_requests() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -133,6 +138,7 @@ async def multi_clients() -> None:
     peer = Peer(
         connect=ZeroMQAddress("tcp://localhost:5020"),
         transport=ZeroMQRPCTransport,
+        transport_opts={"attach_monitor": True},
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
@@ -157,6 +163,11 @@ async def multi_clients() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+
     print("==== Testing with a single client ====")
     asyncio.run(single_client())
 

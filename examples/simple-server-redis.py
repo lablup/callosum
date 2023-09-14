@@ -1,13 +1,11 @@
 import asyncio
 import json
+import logging
 import os
 import signal
 import time
 
-from callosum.lower.rpc_redis import (
-    RedisStreamAddress,
-    RPCRedisTransport,
-)
+from callosum.lower.rpc_redis import RedisStreamAddress, RPCRedisTransport
 from callosum.rpc import Peer
 
 
@@ -57,4 +55,9 @@ async def serve() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+    )
+    log = logging.getLogger()
     asyncio.run(serve())
