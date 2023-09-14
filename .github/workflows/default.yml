@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -59,7 +59,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -80,14 +80,14 @@ jobs:
       run: |
         ./scripts/run-integration-tests.sh
 
-  deploy-to-pypi:
+  build-distributions:
     needs: [test-unit, test-integration]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Set up Python
@@ -105,17 +105,36 @@ jobs:
     - name: Build packages
       run: |
         python setup.py sdist bdist_wheel
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: distributions
+        path: dist
+
+  deploy-to-pypi:
+    needs: [build-distributions]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: distributions
+        path: dist
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.4"
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
-    - name: Release to GitHub
+    - name: Publish to GitHub
       uses: softprops/action-gh-release@v1
       with:
         body_path: "CHANGELOG_RELEASE.md"
@@ -123,3 +142,5 @@ jobs:
         files: |
           dist/*.tar.gz
           dist/*.whl
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
