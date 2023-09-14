@@ -142,7 +142,13 @@ jobs:
         python -m pip install -U -r requirements/build.txt
     - name: Build packages
       run: |
+        python -c "import callosum; print(callosum.__version__)" | tee version.txt
         python -m build -s -w
+    - name: Upload the build version
+      uses: actions/upload-artifact@v3
+      with:
+        name: version
+        path: version.txt
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -159,6 +165,11 @@ jobs:
       id-token: write
 
     steps:
+    - name: Download the build version
+      uses: actions/download-artifact@v3
+      with:
+        name: version
+        path: version.txt
     - name: Download build artifacts
       uses: actions/download-artifact@v3
       with:
