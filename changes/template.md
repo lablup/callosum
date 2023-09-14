@@ -1,6 +1,6 @@
 {% if top_line %}
 {{ top_line }}
-{{ versiondata.version }} ({{ versiondata.date }})
+v{{ versiondata.version }} ({{ versiondata.date }})
 {% endif %}
 {%- for section, _ in sections.items() -%}
   {%- if sections[section] -%}

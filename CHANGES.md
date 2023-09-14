@@ -15,6 +15,14 @@
 
 <!-- towncrier release notes start -->
 
+## v1.0.0 (2023-09-14)
+
+### Breaking change
+* Now it requires Python 3.11 to work!
+
+### Features
+* Implement the full version of secure, encrypted RPC communication based on ZeroMQ's ZAP protocol using CURVE keypairs ([#21](https://github.com/lablup/callosum/issues/21))
+
 
 ## v0.9.10 (2022-02-17)
 
