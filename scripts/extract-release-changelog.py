@@ -11,7 +11,7 @@ def get_tag():
     if gh_ref_name:
         return gh_ref_name
     p = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True
+        ["git", "describe", "--abbrev=0", "--tags"], capture_output=True
     )
     revision = p.stdout.decode().strip()
     return revision
@@ -23,7 +23,6 @@ def get_prev_tag():
         capture_output=True,
     )
     rev = p.stdout.decode().strip()
-
     p = subprocess.run(
         ["git", "describe", "--abbrev=0", "--tags", f"{rev}"], capture_output=True
     )
@@ -50,23 +49,24 @@ def main():
     input_path = Path("./CHANGES.md")
     output_path = Path("./CHANGELOG_RELEASE.md")
     try:
-        version = Path("./VERSION").read_text().strip()
+        version = tag
         input_text = input_path.read_text()
         m = re.search(
-            rf"(?:^|\n)## {re.escape(version)}(?:[^\n]*)?\n(.*?)(?:\n## |$)",
+            rf"(?:^|\n)## v?{re.escape(version)}(?:[^\n]*)?\n(.*?)(?:\n## |$)",
             input_text,
             re.S,
         )
         if m is not None:
             content = m.group(1).strip()
+            content += "\n"
             content += (
-                f"\n\n### Full Changelog"
-                f"\n\nCheck out [the full changelog]({changelog_url}) "
+                f"\n### Full Changelog"
+                f"\nCheck out [the full changelog]({changelog_url}) "
                 f"until this release ({tag}).\n"
             )
             content += (
-                f"\n\n### Full Commit Logs"
-                f"\n\nCheck out [the full commit logs]({commitlog_url}) "
+                f"\n### Full Commit Logs"
+                f"\nCheck out [the full commit logs]({commitlog_url}) "
                 f"between release ({prev_tag}) and ({tag}).\n"
             )
             if not args.draft:
