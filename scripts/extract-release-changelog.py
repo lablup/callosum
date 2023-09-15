@@ -1,15 +1,11 @@
 import argparse
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 
-def get_tag():
-    gh_ref_name = os.environ.get("GITHUB_REF_NAME")
-    if gh_ref_name:
-        return gh_ref_name
+def get_current_tag():
     p = subprocess.run(
         ["git", "describe", "--abbrev=0", "--tags"], capture_output=True
     )
@@ -17,14 +13,10 @@ def get_tag():
     return revision
 
 
-def get_prev_tag():
+def get_prev_tag(current_tag):
     p = subprocess.run(
-        ["git", "rev-list", "--tags", "--skip=1", "--max-count=1"],
+        ["git", "describe", "--abbrev=0", "--tags", f"{current_tag}^"],
         capture_output=True,
-    )
-    rev = p.stdout.decode().strip()
-    p = subprocess.run(
-        ["git", "describe", "--abbrev=0", "--tags", f"{rev}"], capture_output=True
     )
     tag = p.stdout.decode().strip()
     return tag
@@ -40,16 +32,21 @@ def main():
     )
     args = parser.parse_args()
 
-    prev_tag, tag = get_prev_tag(), get_tag()
-    commitlog_url = f"https://github.com/lablup/callosum/compare/{prev_tag}...{tag}"
-    changelog_url = f"https://github.com/lablup/callosum/blob/{tag}/CHANGELOG.md"
+    current_tag = get_current_tag()
+    prev_tag = get_prev_tag(current_tag)
+    commitlog_url = (
+        f"https://github.com/lablup/callosum/compare/{prev_tag}...{current_tag}"
+    )
+    changelog_url = (
+        f"https://github.com/lablup/callosum/blob/{current_tag}/CHANGELOG.md"
+    )
 
-    print(f"Making release notes for {tag} ...", file=sys.stderr)
+    print(f"Making release notes for {current_tag} ...", file=sys.stderr)
 
     input_path = Path("./CHANGES.md")
     output_path = Path("./CHANGELOG_RELEASE.md")
     try:
-        version = tag
+        version = current_tag
         input_text = input_path.read_text()
         m = re.search(
             rf"(?:^|\n)## v?{re.escape(version)}(?:[^\n]*)?\n(.*?)(?:\n## |$)",
@@ -62,12 +59,12 @@ def main():
             content += (
                 f"\n### Full Changelog"
                 f"\nCheck out [the full changelog]({changelog_url}) "
-                f"until this release ({tag}).\n"
+                f"until this release ({current_tag}).\n"
             )
             content += (
                 f"\n### Full Commit Logs"
                 f"\nCheck out [the full commit logs]({commitlog_url}) "
-                f"between release ({prev_tag}) and ({tag}).\n"
+                f"between release ({prev_tag}) and ({current_tag}).\n"
             )
             if not args.draft:
                 output_path.write_text(content)
