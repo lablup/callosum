@@ -183,11 +183,15 @@ async def init_authenticator(
 ) -> None:
     match authenticator:
         case AbstractServerAuthenticator() as auth:
+            server_public_key = await auth.server_public_key()
             server_id = await auth.server_identity()
             sock.zap_domain = server_id.domain.encode("utf8")
             sock.setsockopt(zmq.CURVE_SERVER, 1)
             sock.setsockopt(zmq.CURVE_SECRETKEY, server_id.private_key)
-            log.info("init authenticator as server (server_id=%r)", server_id)
+            log.debug(
+                "init_authenticator(): start as server (server_public_key=%r)",
+                server_public_key.decode(),
+            )
         case AbstractClientAuthenticator() as auth:
             client_id = await auth.client_identity()
             client_public_key = await auth.client_public_key()
@@ -196,7 +200,14 @@ async def init_authenticator(
             sock.setsockopt(zmq.CURVE_SERVERKEY, server_public_key)
             sock.setsockopt(zmq.CURVE_PUBLICKEY, client_public_key)
             sock.setsockopt(zmq.CURVE_SECRETKEY, client_id.private_key)
-            log.info("init authenticator as client (client_id=%r)", client_id)
+            log.debug(
+                (
+                    "init_authenticator(): start as client "
+                    "(client_public_key=%r, server_public_key=%r)"
+                ),
+                client_public_key.decode(),
+                server_public_key.decode(),
+            )
         case None:
             pass
 
@@ -311,14 +322,12 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         self._attach_monitor = attach_monitor
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
 
-    async def ping(self, ping_timeout: int = 1000) -> bool:
+    async def ping(self, ping_timeout: Optional[int] = None) -> bool:
         assert self._main_sock is not None
         sock: zmq.asyncio.Socket = self._main_sock
         await sock.send_multipart([b"PING", b"", b""])
-        ret = await sock.poll(ping_timeout)
-        if ret == 0:
-            return False
-        response = await sock.recv_multipart()
+        async with asyncio.timeout(ping_timeout / 1000 if ping_timeout else None):
+            response = await sock.recv_multipart()
         return response[0] == b"PONG"
 
     async def __aenter__(self):
@@ -378,11 +387,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         self._attach_monitor = attach_monitor
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
 
-    async def ping(self, ping_timeout: int = 1000) -> bool:
+    async def ping(self, ping_timeout: Optional[int] = None) -> bool:
         assert self._main_sock is not None
         sock: zmq.asyncio.Socket = self._main_sock
         await sock.send_multipart([b"PING", b"", b""])
-        async with asyncio.timeout(ping_timeout / 1000):
+        async with asyncio.timeout(ping_timeout / 1000 if ping_timeout else None):
             response = await sock.recv_multipart()
         return response[0] == b"PONG"
 
