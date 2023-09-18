@@ -15,6 +15,12 @@
 
 <!-- towncrier release notes start -->
 
+## v1.0.1 (2023-09-18)
+
+### Fixes
+* Prevent leaking secret keys in the logs and allow infinite timeouts on connection pings ([#24](https://github.com/lablup/callosum/issues/24))
+
+
 ## v1.0.0 (2023-09-14)
 
 ### Breaking change
