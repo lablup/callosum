@@ -125,6 +125,7 @@ async def client(
         serializer=lambda o: json.dumps(o).encode("utf8"),
         deserializer=lambda b: json.loads(b),
         invoke_timeout=2.0,
+        transport_opts={"handshake_timeout": 0.2},
     )
     async with peer:
         resp = await peer.invoke("echo", {"sent": "asdf"})

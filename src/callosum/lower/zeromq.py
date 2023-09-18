@@ -380,11 +380,13 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         addr: AbstractAddress,
         *,
         attach_monitor: bool = False,
+        handshake_timeout: float | None = None,
         zsock_opts: Optional[Mapping[int, Any]] = None,
         **transport_opts,
     ) -> None:
         super().__init__(transport, addr)
         self._attach_monitor = attach_monitor
+        self._handshake_timeout = handshake_timeout
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
 
     async def ping(self, ping_timeout: Optional[int] = None) -> bool:
@@ -414,7 +416,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         self._main_sock = client_sock
         self.transport._sock = client_sock
         try:
-            await self.ping(ping_timeout=5000)
+            await self.ping(
+                ping_timeout=int(self._handshake_timeout * 1000)
+                if self._handshake_timeout is not None
+                else 5000
+            )
         except asyncio.TimeoutError:
             raise AuthenticationError
         handshake_done = time.perf_counter()
