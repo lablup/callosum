@@ -57,14 +57,13 @@ select = [
     # "B",  # flake8-bugbear
 ]
 ignore = ["E203","E731","E501"]
+preview = true
+target-version = "py311"
 
 [tool.ruff.isort]
 known-first-party = ["callosum"]
 known-local-folder = ["src"]
 split-on-trailing-comma = true
-
-[tool.black]
-line-length = 85
 
 [tool.mypy]
 ignore_missing_imports = true
