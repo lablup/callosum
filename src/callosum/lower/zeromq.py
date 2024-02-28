@@ -324,14 +324,6 @@ class ZeroMQBaseBinder(ZeroMQMonitorMixin, AbstractBinder):
         self._attach_monitor = attach_monitor
         self._zsock_opts = {**_default_zsock_opts, **(zsock_opts or {})}
 
-    async def ping(self, ping_timeout: Optional[int] = None) -> bool:
-        assert self._main_sock is not None
-        sock: zmq.asyncio.Socket = self._main_sock
-        await sock.send_multipart([b"PING", b"", b""])
-        async with asyncio.timeout(ping_timeout / 1000 if ping_timeout else None):
-            response = await sock.recv_multipart()
-        return response[0] == b"PONG"
-
     async def __aenter__(self):
         if not self.transport._closed:
             return ZeroMQRPCConnection(self.transport)
@@ -395,9 +387,13 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         assert self._main_sock is not None
         sock: zmq.asyncio.Socket = self._main_sock
         await sock.send_multipart([b"PING", b"", b""])
-        async with asyncio.timeout(ping_timeout / 1000 if ping_timeout else None):
-            response = await sock.recv_multipart()
-        return response[0] == b"PONG"
+        if await sock.poll(ping_timeout):
+            try:
+                response = await sock.recv_multipart(zmq.NOBLOCK)
+            except zmq.Again:
+                return False
+            return response[0] == b"PONG"
+        return False
 
     async def __aenter__(self) -> ZeroMQRPCConnection:
         if not self.transport._closed:
