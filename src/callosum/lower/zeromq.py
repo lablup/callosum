@@ -225,22 +225,30 @@ class ZeroMQRPCConnection(AbstractConnection):
         assert self.transport._sock is not None
         while True:
             multipart_msg = await self.transport._sock.recv_multipart()
-            *pre, zmsg_type, raw_header, raw_body = multipart_msg
-            if zmsg_type == b"PING":
-                await self.transport._sock.send_multipart([
-                    *pre,
-                    b"PONG",
-                    raw_header,
-                    raw_body,
-                ])
-            elif zmsg_type == b"UPPER":
-                if len(pre) > 0:
-                    # server
-                    peer_id = pre[0]
-                    yield RawHeaderBody(raw_header, raw_body, peer_id)
-                else:
-                    # client
-                    yield RawHeaderBody(raw_header, raw_body, None)
+            try:
+                *pre, zmsg_type, raw_header, raw_body = multipart_msg
+                if zmsg_type == b"PING":
+                    await self.transport._sock.send_multipart([
+                        *pre,
+                        b"PONG",
+                        raw_header,
+                        raw_body,
+                    ])
+                elif zmsg_type == b"UPPER":
+                    if len(pre) > 0:
+                        # server
+                        peer_id = pre[0]
+                        yield RawHeaderBody(raw_header, raw_body, peer_id)
+                    else:
+                        # client
+                        yield RawHeaderBody(raw_header, raw_body, None)
+            except Exception as e:
+                log.debug(
+                    "ZeroMQRPCConnection.recv_message(): "
+                    "exception caught in the recv loop, continuing...",
+                    exc_info=e,
+                )
+                continue
 
     async def send_message(self, raw_msg: RawHeaderBody) -> None:
         assert not self.transport._closed
