@@ -413,13 +413,11 @@ class ZeroMQBaseConnector(ZeroMQMonitorMixin, AbstractConnector):
         client_sock.connect(self.addr.uri)
         self._main_sock = client_sock
         self.transport._sock = client_sock
-        try:
-            await self.ping(
-                ping_timeout=int(self._handshake_timeout * 1000)
-                if self._handshake_timeout is not None
-                else 5000
-            )
-        except asyncio.TimeoutError:
+        if not await self.ping(
+            ping_timeout=int(self._handshake_timeout * 1000)
+            if self._handshake_timeout is not None
+            else 5000
+        ):
             raise AuthenticationError
         handshake_done = time.perf_counter()
         log.debug(
