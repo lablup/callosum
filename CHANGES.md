@@ -15,6 +15,13 @@
 
 <!-- towncrier release notes start -->
 
+## 1.0.2 (2024-02-29)
+
+### Fixes
+* Stabilize ZMQ RPC auth and malformed packet handling ([#27](https://github.com/lablup/callosum/issues/27))### Miscellaneous
+* Update dependencies including pyzmq ('&gt;=23' &rarr; '&gt;=25.1.1' to support Python 3.12) and development tools including ruff to replace the black formatter ([#26](https://github.com/lablup/callosum/issues/26))
+
+
 ## v1.0.1 (2023-09-18)
 
 ### Fixes
