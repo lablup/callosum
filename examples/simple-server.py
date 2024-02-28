@@ -50,18 +50,14 @@ async def handle_output(request):
 
 async def handle_show_memory_stat(request):
     global last_snapshot, scheduler
-    last_snapshot = last_snapshot.filter_traces(
-        (
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-            tracemalloc.Filter(False, tracemalloc.__file__),
-        )
-    )
-    new_snapshot = tracemalloc.take_snapshot().filter_traces(
-        (
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-            tracemalloc.Filter(False, tracemalloc.__file__),
-        )
-    )
+    last_snapshot = last_snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, tracemalloc.__file__),
+    ))
+    new_snapshot = tracemalloc.take_snapshot().filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, tracemalloc.__file__),
+    ))
     top_stats = new_snapshot.compare_to(last_snapshot, "lineno")
     last_snapshot = new_snapshot
     print("[ Top 10 differences ]")

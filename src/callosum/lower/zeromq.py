@@ -227,14 +227,12 @@ class ZeroMQRPCConnection(AbstractConnection):
             multipart_msg = await self.transport._sock.recv_multipart()
             *pre, zmsg_type, raw_header, raw_body = multipart_msg
             if zmsg_type == b"PING":
-                await self.transport._sock.send_multipart(
-                    [
-                        *pre,
-                        b"PONG",
-                        raw_header,
-                        raw_body,
-                    ]
-                )
+                await self.transport._sock.send_multipart([
+                    *pre,
+                    b"PONG",
+                    raw_header,
+                    raw_body,
+                ])
             elif zmsg_type == b"UPPER":
                 if len(pre) > 0:
                     # server
@@ -250,23 +248,19 @@ class ZeroMQRPCConnection(AbstractConnection):
         peer_id = raw_msg.peer_id
         if peer_id is not None:
             # server
-            await self.transport._sock.send_multipart(
-                [
-                    peer_id,
-                    b"UPPER",
-                    raw_msg.header,
-                    raw_msg.body,
-                ]
-            )
+            await self.transport._sock.send_multipart([
+                peer_id,
+                b"UPPER",
+                raw_msg.header,
+                raw_msg.body,
+            ])
         else:
             # client
-            await self.transport._sock.send_multipart(
-                [
-                    b"UPPER",
-                    raw_msg.header,
-                    raw_msg.body,
-                ]
-            )
+            await self.transport._sock.send_multipart([
+                b"UPPER",
+                raw_msg.header,
+                raw_msg.body,
+            ])
 
 
 class ZeroMQMonitorMixin:
@@ -469,7 +463,6 @@ class ZeroMQSubConnector(ZeroMQBaseConnector):
 
 
 class ZeroMQBaseTransport(BaseTransport):
-
     """
     Implementation for the ZeorMQ-backed transport.
 

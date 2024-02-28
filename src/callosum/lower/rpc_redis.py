@@ -206,7 +206,6 @@ class RPCRedisConnector(AbstractConnector):
 
 
 class RPCRedisTransport(BaseTransport):
-
     """
     Implementation for bidirectional transport backend by Redis Streams.
     """
