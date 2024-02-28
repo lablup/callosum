@@ -5,6 +5,7 @@ whether messages are distributed among them and
 whether each consumer gets only the messages
 which have not been obtained by others so far.
 """
+
 import asyncio
 import json
 import logging

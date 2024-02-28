@@ -3,6 +3,7 @@ During the testing, you can launch multiple publishers
 simultaneously, so as to check whether messages from
 multiple publishers are distributed among the consumers.
 """
+
 import asyncio
 import json
 import logging

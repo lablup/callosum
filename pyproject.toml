@@ -48,6 +48,10 @@ underlines = ["", "", ""]
 [tool.ruff]
 line-length = 85
 src = ["src"]
+preview = true
+target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -58,13 +62,10 @@ select = [
 ]
 ignore = ["E203","E731","E501"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["callosum"]
 known-local-folder = ["src"]
 split-on-trailing-comma = true
-
-[tool.black]
-line-length = 85
 
 [tool.mypy]
 ignore_missing_imports = true

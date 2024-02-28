@@ -167,9 +167,9 @@ class Peer(AbstractChannel):
                             client_request_id[1],
                             server_seq_id,
                         )
-                        self._req_idmap[
-                            (request.peer_id, client_request_id)
-                        ] = server_request_id
+                        self._req_idmap[(request.peer_id, client_request_id)] = (
+                            server_request_id
+                        )
                         func_handler = self._lookup_func(request.method)
                         task = asyncio.create_task(
                             self._func_task(

@@ -186,7 +186,6 @@ class DispatchRedisConnector(AbstractConnector):
 
 
 class DispatchRedisTransport(BaseTransport):
-
     """
     Implementation for unidirectional transport backend by Redis Streams.
     """
