@@ -242,7 +242,15 @@ class ZeroMQRPCConnection(AbstractConnection):
                     else:
                         # client
                         yield RawHeaderBody(raw_header, raw_body, None)
+                else:
+                    # Ignore if the peer has sent a malformed multipart message.
+                    log.debug(
+                        "ZeroMQRPCConnection.recv_message(): "
+                        "ignoring an invalid message from the peer..."
+                    )
             except Exception as e:
+                # ValueError may happen when there are garbage packets accepted by
+                # the zmq socket.
                 log.debug(
                     "ZeroMQRPCConnection.recv_message(): "
                     "exception caught in the recv loop, continuing...",
