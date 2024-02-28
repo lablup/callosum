@@ -11,9 +11,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11.4"
+        python-version: "3.11"
     - name: Cache pre-commit dependencies
       id: cache_pre_commit
       uses: actions/cache@v3
@@ -60,9 +60,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11.4"
+        python-version: "3.11"
         cache: pip
         cache-dependency-path: |
           setup.cfg
@@ -99,9 +99,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11.4"
+        python-version: "3.11"
         cache: pip
         cache-dependency-path: |
           setup.cfg
@@ -129,9 +129,9 @@ jobs:
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11.4"
+        python-version: "3.11"
         cache: pip
         cache-dependency-path: |
           setup.cfg
@@ -180,7 +180,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11.4"
+        python-version: "3.11"
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
