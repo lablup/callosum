@@ -48,6 +48,10 @@ underlines = ["", "", ""]
 [tool.ruff]
 line-length = 85
 src = ["src"]
+preview = true
+target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -57,10 +61,8 @@ select = [
     # "B",  # flake8-bugbear
 ]
 ignore = ["E203","E731","E501"]
-preview = true
-target-version = "py311"
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["callosum"]
 known-local-folder = ["src"]
 split-on-trailing-comma = true

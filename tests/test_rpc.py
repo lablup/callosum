@@ -93,7 +93,7 @@ async def dummy_client(
 async def test_messaging(scheduler_cls) -> None:
     done = asyncio.Event()
     total = 50
-    call_results: List[int] = []
+    call_results: List[int | BaseException] = []
     return_results: List[int] = []
     # a list of events to make fucntions to return in the reversed order
     order_events = [asyncio.Event() for _ in range(total)]
@@ -159,7 +159,7 @@ async def test_messaging_server_cancellation(scheduler_cls) -> None:
     total = 200
     cancel_idxs = [False] * 130 + [True] * 70
     random.shuffle(cancel_idxs)
-    call_results: List[int] = []
+    call_results: List[int | BaseException] = []
     return_results: List[int] = []
     # a list of events to make fucntions to return in the reversed order
     order_events = [asyncio.Event() for _ in range(total)]
@@ -232,7 +232,7 @@ async def test_messaging_server_error(scheduler_cls) -> None:
     total = 200
     error_idxs = [False] * 130 + [True] * 70
     random.shuffle(error_idxs)
-    call_results: List[int] = []
+    call_results: List[int | BaseException] = []
     return_results: List[int] = []
     # a list of events to make fucntions to return in the reversed order
     order_events = [asyncio.Event() for _ in range(total)]

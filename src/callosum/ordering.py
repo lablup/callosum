@@ -170,7 +170,6 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
         self._tasks.pop(request_id, None)
 
     async def cancel(self, request_id) -> None:
-        method, okey, seq = request_id
         if request_id in self._futures:
             task = self._tasks.get(request_id, None)
             if task is None:
