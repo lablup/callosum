@@ -15,7 +15,7 @@
 
 <!-- towncrier release notes start -->
 
-## 1.0.2.dev0+gff5a869.d20240228 (2024-03-04)
+## 1.0.3 (2024-03-04)
 
 ### Fixes
 * Relax yarl version requirements to avoid potential dependency conflicts in the downstream Backend.AI platform ([#28](https://github.com/lablup/callosum/issues/28))
