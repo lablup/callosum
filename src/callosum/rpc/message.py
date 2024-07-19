@@ -72,6 +72,40 @@ class ErrorMetadata(Metadata):
     repr: str
     traceback: str
 
+    sub_errors: tuple[ErrorMetadata, ...] = attrs.field(factory=tuple)
+
+    @classmethod
+    def decode(cls, buffer: bytes) -> Any:
+        if not buffer:
+            return None
+        values = munpackb(buffer)
+        match values:
+            case (name, repr, traceback, raw_sub_errors):
+                return cls(name, repr, traceback, tuple(cls.decode(raw_error) for raw_error in raw_sub_errors))
+            case _:
+                return cls(*values)
+
+    def encode(self) -> bytes:
+        values = [self.name, self.repr, self.traceback, [err.encode() for err in self.sub_errors]]
+        return mpackb(values)
+
+    @classmethod
+    def from_exception(cls, exc: BaseExceptionGroup | BaseException, formatted_traceback: str) -> ErrorMetadata:
+        match exc:
+            case BaseExceptionGroup():
+                return ErrorMetadata(
+                    "ExceptionGroup",
+                    repr(exc),
+                    formatted_traceback,
+                    sub_errors=tuple(cls.from_exception(sub_exc, formatted_traceback) for sub_exc in exc.exceptions)
+                )
+            case _:
+                return ErrorMetadata(
+                    type(exc).__name__,
+                    repr(exc),
+                    formatted_traceback,
+                )
+
 
 @attrs.define(frozen=True, slots=True)
 class NullMetadata(Metadata):
@@ -150,11 +184,7 @@ class RPCMessage(AbstractMessage):
             request.method,
             request.order_key,
             request.client_seq_id,
-            ErrorMetadata(
-                exc_info[0].__name__,
-                repr(exc_info[1]),
-                traceback.format_exc(),
-            ),
+            ErrorMetadata.from_exception(exc_info[1], traceback.format_exc()),
             None,
         )
 
@@ -174,11 +204,7 @@ class RPCMessage(AbstractMessage):
             request.method,
             request.order_key,
             request.client_seq_id,
-            ErrorMetadata(
-                exc_info[0].__name__,
-                repr(exc_info[1]),
-                traceback.format_exc(),
-            ),
+            ErrorMetadata.from_exception(exc_info[1], traceback.format_exc()),
             None,
         )
 
