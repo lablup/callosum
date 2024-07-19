@@ -17,8 +17,6 @@ from typing import (
     Union,
 )
 
-import attrs
-
 from ..abc import (
     AbstractChannel,
     AbstractDeserializer,

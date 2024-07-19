@@ -40,6 +40,7 @@ class RPCUserError(RPCError):
     Represents an error caused in user-defined handlers.
     """
 
+
 class RPCInternalError(RPCError):
     """
     Represents an error caused in Calloum's internal logic.

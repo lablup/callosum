@@ -81,23 +81,38 @@ class ErrorMetadata(Metadata):
         values = munpackb(buffer)
         match values:
             case (name, repr, traceback, raw_sub_errors):
-                return cls(name, repr, traceback, tuple(cls.decode(raw_error) for raw_error in raw_sub_errors))
+                return cls(
+                    name,
+                    repr,
+                    traceback,
+                    tuple(cls.decode(raw_error) for raw_error in raw_sub_errors),
+                )
             case _:
                 return cls(*values)
 
     def encode(self) -> bytes:
-        values = [self.name, self.repr, self.traceback, [err.encode() for err in self.sub_errors]]
+        values = [
+            self.name,
+            self.repr,
+            self.traceback,
+            [err.encode() for err in self.sub_errors],
+        ]
         return mpackb(values)
 
     @classmethod
-    def from_exception(cls, exc: BaseExceptionGroup | BaseException, formatted_traceback: str) -> ErrorMetadata:
+    def from_exception(
+        cls, exc: BaseExceptionGroup | BaseException, formatted_traceback: str
+    ) -> ErrorMetadata:
         match exc:
             case BaseExceptionGroup():
                 return ErrorMetadata(
                     "ExceptionGroup",
                     repr(exc),
                     formatted_traceback,
-                    sub_errors=tuple(cls.from_exception(sub_exc, formatted_traceback) for sub_exc in exc.exceptions)
+                    sub_errors=tuple(
+                        cls.from_exception(sub_exc, formatted_traceback)
+                        for sub_exc in exc.exceptions
+                    ),
                 )
             case _:
                 return ErrorMetadata(
