@@ -91,10 +91,10 @@ dev-dependencies = [
     # Development dependencies
     "pre-commit",
     # Lint dependencies
-    "ruff>=0.2.2",
-    "ruff-lsp>=0.0.52",
+    "ruff>=0.11.13",
+    "ruff-lsp>=0.0.62",
     # Typecheck dependencies
-    "mypy~=1.8.0",
+    "mypy~=1.16.0",
     "types-python-dateutil",
     "types-redis",
 ]
