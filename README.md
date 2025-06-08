@@ -132,10 +132,10 @@ This project uses [towncrier](https://towncrier.readthedocs.io/) for changelog m
 1. **Ensure all changes are documented**: Add change fragments to the `changes/` directory:
    ```console
    # For a bug fix
-   $ echo "Fix description of the bug fix ([#123](https://github.com/lablup/callosum/issues/123))" > changes/123.fix.md
+   $ echo "Fix description of the bug fix" > changes/123.fix.md
 
    # For a new feature
-   $ echo "Description of the new feature ([#124](https://github.com/lablup/callosum/issues/124))" > changes/124.feature.md
+   $ echo "Description of the new feature" > changes/124.feature.md
    ```
 
 2. **Generate the changelog**: Create a draft changelog to review:
