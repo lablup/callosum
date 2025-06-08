@@ -2,8 +2,102 @@
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "callosum"
+dynamic = ["version"]
+authors = [
+    {name = "Joongi Kim", email = "joongi@lablup.com"},
+]
+maintainers = [
+    {name = "Lablup Inc.", email = "devops@lablup.com"},
+]
+description = "Callosum RPC Library"
+readme = {file = "README.md", content-type = "text/markdown"}
+keywords = ["asyncio", "rpc", "pubsub", "messaging"]
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Communications",
+    "Topic :: Internet",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "attrs>=21.3.0",
+    "python-dateutil>=2.8.2",
+    "msgpack>=1.0.7",
+    "temporenc>=0.1",
+    "yarl>=1.8.2,!=1.9.0,!=1.9.1,!=1.9.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/lablup/callosum"
+Repository = "https://github.com/lablup/callosum"
+Issues = "https://github.com/lablup/callosum/issues"
+Changelog = "https://github.com/lablup/callosum/blob/main/CHANGES.md"
+Download = "https://pypi.org/project/callosum"
+
+[project.optional-dependencies]
+docs = [
+    "sphinx~=4.3",
+    "sphinx-autodoc-typehints",
+]
+thrift = [
+    "thriftpy2>=0.4.20",
+]
+zeromq = [
+    "pyzmq>=25.1.1",
+]
+redis = [
+    "redis>=4.6.0",
+]
+snappy = [
+    "python-snappy>=0.6.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools_scm]
 # enables setuptools_scm to provide the dynamic version
+
+[tool.uv]
+dev-dependencies = [
+    # Build dependencies
+    "build>=1.0.3",
+    "wheel>=0.41.0",
+    "twine~=4.0",
+    "towncrier~=22.12",
+    # Test dependencies
+    "Click>=8.0",
+    "pytest~=7.2.2",
+    "pytest-asyncio~=0.21",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "codecov>=2.1",
+    # Development dependencies
+    "pre-commit",
+    # Lint dependencies
+    "ruff>=0.2.2",
+    "ruff-lsp>=0.0.52",
+    # Typecheck dependencies
+    "mypy~=1.8.0",
+    "types-python-dateutil",
+    "types-redis",
+]
 
 [tool.towncrier]
 package = "callosum"
