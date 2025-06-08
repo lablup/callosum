@@ -141,9 +141,9 @@ class ZAPServer:
             )
             allowed = result.success
             if allowed:
-                assert result.user_id is not None, (
-                    "expected valid user ID from check_client() callback"
-                )
+                assert (
+                    result.user_id is not None
+                ), "expected valid user ID from check_client() callback"
                 user_id = result.user_id
         else:
             # In Callosum, we only support public-key based authentication.
