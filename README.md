@@ -102,6 +102,17 @@ Build the package:
 $ uv build
 ```
 
+### News Fragment Types
+
+Use these suffixes to put news fragments in the `changes/` directory for each PR, whereas the name should be the PR number (e.g., `1234.fix.dm`):
+
+- `.breaking.md` - Breaking changes
+- `.feature.md` - New features  
+- `.fix.md` - Bug fixes
+- `.deprecation.md` - Deprecation notices
+- `.doc.md` - Documentation changes
+- `.misc.md` - Miscellaneous changes
+
 ### Running Examples
 
 You can run examples using uv with additional dependencies:
@@ -110,3 +121,60 @@ You can run examples using uv with additional dependencies:
 $ uv sync --extra zeromq --extra redis --extra thrift --extra snappy
 $ uv run python examples/simple-server.py
 ```
+
+Making a Release
+----------------
+
+This project uses [towncrier](https://towncrier.readthedocs.io/) for changelog management and [setuptools-scm](https://setuptools-scm.readthedocs.io/) for automatic versioning based on git tags.
+
+### Release Process
+
+1. **Ensure all changes are documented**: Add change fragments to the `changes/` directory:
+   ```console
+   # For a bug fix
+   $ echo "Fix description of the bug fix ([#123](https://github.com/lablup/callosum/issues/123))" > changes/123.fix.md
+   
+   # For a new feature  
+   $ echo "Description of the new feature ([#124](https://github.com/lablup/callosum/issues/124))" > changes/124.feature.md
+   ```
+
+2. **Generate the changelog**: Create a draft changelog to review:
+   ```console
+   $ uv run towncrier build --draft --version 1.0.4
+   ```
+
+3. **Build and finalize the changelog**: When ready to release:
+   ```console
+   $ uv run towncrier build --version 1.0.4
+   ```
+   This updates `CHANGES.md` and removes the change fragments.
+
+4. **Commit the changelog**:
+   ```console
+   $ git add CHANGES.md changes/
+   $ git commit -m "release: 1.0.4"
+   ```
+
+5. **Create and push a annotated, signed git tag**:
+   ```console
+   $ git tag -a -s 1.0.4
+   $ git push origin main --tags
+   ```
+
+6. **Automated release**: The GitHub Actions workflow will automatically:
+   - Run all tests and checks
+   - Build source and wheel distributions using `uv build`
+   - Extract release notes from the changelog
+   - Create a GitHub release with the built artifacts
+   - Publish to PyPI using trusted publishing
+
+### Release Workflow
+
+The release is triggered automatically when a git tag is pushed. The workflow:
+
+1. **Triggers on**: Git tag push (e.g., `git push origin --tags`)
+2. **Builds**: Uses `uv build` to create distributions
+3. **Publishes**: 
+   - GitHub release with changelog and artifacts
+   - PyPI release using trusted publishing (no manual tokens needed)
+4. **Determines release type**: Automatically detects pre-releases (`rc`, `a` (alpha), `b` (beta), `dev` suffixes)
