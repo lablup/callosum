@@ -50,9 +50,7 @@ async def test_timeout(peer):
                 },
             )
     except asyncio.TimeoutError:
-        print(
-            "long_delay(): timeout occurred as expected " "(with per-call timeout)"
-        )
+        print("long_delay(): timeout occurred as expected (with per-call timeout)")
     except Exception as e:
         print("long_delay(): unexpected error", e)
         sys.exit(1)
@@ -68,7 +66,7 @@ async def test_timeout(peer):
             },
         )
     except asyncio.TimeoutError:
-        print("long_delay(): timeout occurred as expected " "(with default timeout)")
+        print("long_delay(): timeout occurred as expected (with default timeout)")
     except Exception as e:
         print("long_delay(): unexpected error", e)
         sys.exit(1)

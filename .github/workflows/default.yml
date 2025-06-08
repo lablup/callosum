@@ -1,6 +1,15 @@
 name: default
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+    branches:
+    - 'main'
+  workflow_dispatch:
 
 jobs:
 
@@ -10,6 +19,10 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -62,25 +75,24 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: pip
-        cache-dependency-path: |
-          setup.cfg
-          requirements/test.txt
     - name: Install dependencies
       run: |
         sudo apt install -y libsnappy-dev
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
+        uv sync --extra zeromq --extra redis --extra thrift --extra snappy
     - name: Run unit tests
       env:
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
       run: |
-        python -m pytest --cov tests
+        uv run python -m pytest --cov tests
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
 
@@ -104,25 +116,24 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: pip
-        cache-dependency-path: |
-          setup.cfg
-          requirements/test.txt
     - name: Install dependencies
       run: |
         sudo apt install -y libsnappy-dev
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -e ".[build,test,zeromq,redis,thrift,snappy]"
+        uv sync --extra zeromq --extra redis --extra thrift --extra snappy
     - name: Run integration tests
       env:
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
       run: |
-        ./scripts/run-integration-tests.sh
+        uv run ./scripts/run-integration-tests.sh
 
   build-distributions:
     needs: [pre-commit-check, test-unit, test-integration]
@@ -134,29 +145,28 @@ jobs:
       uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
-        cache: pip
-        cache-dependency-path: |
-          setup.cfg
-          requirements/build.txt
     - name: Install dependencies
       run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/build.txt
+        uv sync
     - name: Build packages
       run: |
-        python -c "import callosum; print(callosum.__version__)" | tee version.txt
-        python -m build -s -w
+        uv run python -c "import callosum; print(callosum.__version__)" | tee version.txt
+        uv build
     - name: Upload the build version
       uses: actions/upload-artifact@v4
       with:
         name: version
         path: version.txt
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: distributions
         path: dist
@@ -179,7 +189,7 @@ jobs:
         name: version
         path: .
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: distributions
         path: dist
@@ -192,7 +202,7 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Publish to GitHub
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
