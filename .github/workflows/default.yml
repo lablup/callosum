@@ -1,6 +1,15 @@
 name: default
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+    branches:
+    - 'main'
+  workflow_dispatch:
 
 jobs:
 
