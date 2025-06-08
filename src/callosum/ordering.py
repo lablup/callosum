@@ -184,7 +184,7 @@ class KeySerializedAsyncScheduler(AbstractAsyncScheduler):
             # The scheduler caller (upper) will call cleanup.
         else:
             self._log.warning(
-                "cancellation of unknown or " "not sent yet request: %r", request_id
+                "cancellation of unknown or not sent yet request: %r", request_id
             )
 
 

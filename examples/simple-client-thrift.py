@@ -50,8 +50,7 @@ async def call() -> None:
                 await peer.invoke("simple", adaptor.long_delay())
         except asyncio.TimeoutError:
             print(
-                "long_delay(): timeout occurred as expected "
-                "(with per-call timeout)"
+                "long_delay(): timeout occurred as expected (with per-call timeout)"
             )
         else:
             print("long_delay(): timeout did not occur!")
@@ -61,8 +60,7 @@ async def call() -> None:
             await peer.invoke("simple", adaptor.long_delay())
         except asyncio.TimeoutError:
             print(
-                "long_delay(): timeout occurred as expected "
-                "(with default timeout)"
+                "long_delay(): timeout occurred as expected (with default timeout)"
             )
         else:
             print("long_delay(): timeout did not occur!")
