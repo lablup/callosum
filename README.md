@@ -63,11 +63,50 @@ Please check out [the examples directory.](https://github.com/lablup/callosum/tr
 Development
 -----------
 
-Create a virtual environment or an isolated Python environment using your favorite tool.
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management and development workflow.
 
-Inside it, run editable installation as follows:
+### Prerequisites
+
+Install uv:
 
 ```console
-$ pip install -U pip setuptools
-$ pip install -U -r requirements/dev.txt
+$ curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Setup
+
+Clone the repository and set up the development environment:
+
+```console
+$ git clone https://github.com/lablup/callosum.git
+$ cd callosum
+$ uv sync --dev
+```
+
+This will create a virtual environment and install the package in editable mode along with all development dependencies.
+
+### Development Commands
+
+Run tests:
+```console
+$ uv run pytest
+```
+
+Run pre-commit hooks for linting:
+```console
+$ pre-commit run --all-files
+```
+
+Build the package:
+```console
+$ uv build
+```
+
+### Running Examples
+
+You can run examples using uv with additional dependencies:
+
+```console
+$ uv sync --extra zeromq --extra redis --extra thrift --extra snappy
+$ uv run python examples/simple-server.py
 ```
