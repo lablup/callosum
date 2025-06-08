@@ -45,6 +45,9 @@ jobs:
   test-unit:
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     services:
       redis:
         image: redis:7-alpine
@@ -62,7 +65,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: ${{ matrix.python-version }}
         cache: pip
         cache-dependency-path: |
           setup.cfg
@@ -84,6 +87,9 @@ jobs:
   test-integration:
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     services:
       redis:
         image: redis:7-alpine
@@ -101,7 +107,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: ${{ matrix.python-version }}
         cache: pip
         cache-dependency-path: |
           setup.cfg
@@ -145,7 +151,7 @@ jobs:
         python -c "import callosum; print(callosum.__version__)" | tee version.txt
         python -m build -s -w
     - name: Upload the build version
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: version
         path: version.txt
@@ -168,7 +174,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Download the build version
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: version
         path: .
@@ -178,7 +184,7 @@ jobs:
         name: distributions
         path: dist
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
     - name: Extract the release changelog
