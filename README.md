@@ -107,7 +107,7 @@ $ uv build
 Use these suffixes to put news fragments in the `changes/` directory for each PR, whereas the name should be the PR number (e.g., `1234.fix.dm`):
 
 - `.breaking.md` - Breaking changes
-- `.feature.md` - New features  
+- `.feature.md` - New features
 - `.fix.md` - Bug fixes
 - `.deprecation.md` - Deprecation notices
 - `.doc.md` - Documentation changes
@@ -133,8 +133,8 @@ This project uses [towncrier](https://towncrier.readthedocs.io/) for changelog m
    ```console
    # For a bug fix
    $ echo "Fix description of the bug fix ([#123](https://github.com/lablup/callosum/issues/123))" > changes/123.fix.md
-   
-   # For a new feature  
+
+   # For a new feature
    $ echo "Description of the new feature ([#124](https://github.com/lablup/callosum/issues/124))" > changes/124.feature.md
    ```
 
@@ -174,7 +174,7 @@ The release is triggered automatically when a git tag is pushed. The workflow:
 
 1. **Triggers on**: Git tag push (e.g., `git push origin --tags`)
 2. **Builds**: Uses `uv build` to create distributions
-3. **Publishes**: 
+3. **Publishes**:
    - GitHub release with changelog and artifacts
    - PyPI release using trusted publishing (no manual tokens needed)
 4. **Determines release type**: Automatically detects pre-releases (`rc`, `a` (alpha), `b` (beta), `dev` suffixes)
