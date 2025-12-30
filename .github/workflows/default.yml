@@ -11,6 +11,10 @@ on:
     - 'main'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   pre-commit-check:
@@ -20,30 +24,18 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v5
       with:
-        version: "latest"
+        enable-cache: true
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    - name: Cache pre-commit dependencies
-      id: cache_pre_commit
+      run: uv python install 3.11
+    - name: Install dependencies
+      run: uv sync --frozen
+    - name: Cache pre-commit
       uses: actions/cache@v4
       with:
-        path: |
-          .pre_commit_venv
-          ~/.cache/pre-commit
-        key: pre-commit-${{ hashFiles('.pre-commit-config.yaml','~/.cache/pre-commit/*') }}
-    - name: Install pre-commit
-      if: steps.cache_pre_commit.outputs.cache-hit != 'true'
-      run: |
-        python -m venv .pre_commit_venv
-        . .pre_commit_venv/bin/activate
-        pip install --upgrade pip
-        pip install pre-commit
-        pre-commit install --install-hooks
-        pre-commit gc
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
     - name: Run pre-commit hooks
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -52,8 +44,7 @@ jobs:
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
-        . .pre_commit_venv/bin/activate
-        pre-commit run --color=always --all-files
+        uv run pre-commit run --color=always --all-files
 
   test-unit:
 
@@ -76,25 +67,22 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v5
       with:
-        version: "latest"
+        enable-cache: true
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        sudo apt install -y libsnappy-dev
-        uv sync --extra zeromq --extra redis --extra thrift --extra snappy
+      run: uv python install ${{ matrix.python-version }}
+    - name: Install system dependencies
+      run: sudo apt install -y libsnappy-dev
+    - name: Install Python dependencies
+      run: uv sync --frozen --extra zeromq --extra redis --extra thrift --extra snappy
     - name: Run unit tests
       env:
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
-      run: |
-        uv run python -m pytest --cov tests
+      run: uv run python -m pytest --cov tests
     - name: Upload coverage report
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
 
   test-integration:
 
@@ -117,23 +105,20 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v5
       with:
-        version: "latest"
+        enable-cache: true
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        sudo apt install -y libsnappy-dev
-        uv sync --extra zeromq --extra redis --extra thrift --extra snappy
+      run: uv python install ${{ matrix.python-version }}
+    - name: Install system dependencies
+      run: sudo apt install -y libsnappy-dev
+    - name: Install Python dependencies
+      run: uv sync --frozen --extra zeromq --extra redis --extra thrift --extra snappy
     - name: Run integration tests
       env:
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
-      run: |
-        uv run ./scripts/run-integration-tests.sh
+      run: uv run ./scripts/run-integration-tests.sh
 
   build-distributions:
     needs: [pre-commit-check, test-unit, test-integration]
@@ -146,16 +131,13 @@ jobs:
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v5
       with:
-        version: "latest"
+        enable-cache: true
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      run: uv python install 3.11
     - name: Install dependencies
-      run: |
-        uv sync
+      run: uv sync --frozen
     - name: Build packages
       run: |
         uv run python -c "import callosum; print(callosum.__version__)" | tee version.txt
@@ -193,14 +175,14 @@ jobs:
       with:
         name: distributions
         path: dist
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      run: uv python install 3.11
     - name: Extract the release changelog
       run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
+        uv run python ./scripts/extract-release-changelog.py
+        uv run python ./scripts/determine-release-type.py
     - name: Publish to GitHub
       uses: softprops/action-gh-release@v2
       with:
