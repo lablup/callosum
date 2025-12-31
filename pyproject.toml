@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development",
     "Topic :: Software Development :: Libraries",
     "Topic :: Communications",
@@ -35,7 +36,7 @@ requires-python = ">=3.11"
 dependencies = [
     "attrs>=21.3.0",
     "python-dateutil>=2.8.2",
-    "msgpack>=1.0.7",
+    "msgpack>=1.1.2",  # Python 3.14 support
     "temporenc>=0.1",
     "yarl>=1.8.2,!=1.9.0,!=1.9.1,!=1.9.2",
 ]
