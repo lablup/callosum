@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # Enable version updates for Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      # Group pytest-related packages
+      pytest:
+        patterns:
+          - "pytest*"
+      # Group type stubs
+      type-stubs:
+        patterns:
+          - "types-*"
+      # Group development tools
+      dev-tools:
+        patterns:
+          - "ruff*"
+          - "mypy"
+          - "pre-commit"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "github-actions"
