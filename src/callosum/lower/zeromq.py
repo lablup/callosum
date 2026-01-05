@@ -10,7 +10,6 @@ from typing import Any, AsyncGenerator, ClassVar, Mapping, Optional, Type
 import attrs
 import zmq
 import zmq.asyncio
-import zmq.constants
 import zmq.utils.monitor
 from zmq.utils import z85
 
