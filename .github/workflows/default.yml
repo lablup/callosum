@@ -143,12 +143,12 @@ jobs:
         uv run python -c "import callosum; print(callosum.__version__)" | tee version.txt
         uv build
     - name: Upload the build version
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: version
         path: version.txt
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: distributions
         path: dist
