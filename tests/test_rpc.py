@@ -295,3 +295,97 @@ async def test_messaging_server_error(scheduler_cls) -> None:
             assert e.args[0] == "ZeroDivisionError"
         else:
             assert call_results[idx] == idx
+
+
+@pytest.mark.asyncio
+async def test_external_context_injection() -> None:
+    """Test that an externally injected zmq context is used and not destroyed on close."""
+    import zmq.asyncio
+
+    # Create an external context
+    external_zctx = zmq.asyncio.Context()
+
+    async def func(request: RPCMessage) -> str:
+        return "ok"
+
+    # Create server with external context
+    server = Peer(
+        bind=ZeroMQAddress("tcp://127.0.0.1:5021"),
+        transport=ZeroMQRPCTransport,
+        transport_opts={"zctx": external_zctx},
+        scheduler=ExitOrderedAsyncScheduler(),
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    server.handle_function("func", func)
+
+    # Create client with external context
+    client = Peer(
+        connect=ZeroMQAddress("tcp://localhost:5021"),
+        transport=ZeroMQRPCTransport,
+        transport_opts={"zctx": external_zctx},
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+
+    # Verify the external context is used
+    server_transport = cast(ZeroMQRPCTransport, server._transport)
+    client_transport = cast(ZeroMQRPCTransport, client._transport)
+    assert server_transport._zctx is external_zctx
+    assert server_transport._external_zctx is True
+    assert client_transport._zctx is external_zctx
+    assert client_transport._external_zctx is True
+
+    async with server:
+        async with client:
+            result = await client.invoke("func", {})
+            assert result == "ok"
+
+    # Verify context is NOT destroyed after transport close
+    assert not external_zctx.closed
+
+    # Clean up
+    external_zctx.destroy(linger=0)
+
+
+@pytest.mark.asyncio
+async def test_internal_context_destroyed_on_close() -> None:
+    """Test that internally created zmq context is destroyed on close."""
+
+    async def func(request: RPCMessage) -> str:
+        return "ok"
+
+    # Create server without external context (uses internal)
+    server = Peer(
+        bind=ZeroMQAddress("tcp://127.0.0.1:5022"),
+        transport=ZeroMQRPCTransport,
+        scheduler=ExitOrderedAsyncScheduler(),
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    server.handle_function("func", func)
+
+    # Create client without external context (uses internal)
+    client = Peer(
+        connect=ZeroMQAddress("tcp://localhost:5022"),
+        transport=ZeroMQRPCTransport,
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+
+    # Verify internal context is created
+    server_transport = cast(ZeroMQRPCTransport, server._transport)
+    client_transport = cast(ZeroMQRPCTransport, client._transport)
+    assert server_transport._external_zctx is False
+    assert client_transport._external_zctx is False
+    server_zctx = server_transport._zctx
+    client_zctx = client_transport._zctx
+
+    async with server:
+        async with client:
+            result = await client.invoke("func", {})
+            assert result == "ok"
+
+    # Verify context IS destroyed after transport close
+    assert server_zctx.closed
+    assert client_zctx.closed
