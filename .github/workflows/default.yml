@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
     - name: Set up Python
@@ -32,7 +32,7 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
     - name: Cache pre-commit
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.cache/pre-commit
         key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -65,9 +65,9 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
     - name: Set up Python
@@ -103,9 +103,9 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
     - name: Set up Python
@@ -127,11 +127,11 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
     - name: Set up Python
@@ -143,12 +143,12 @@ jobs:
         uv run python -c "import callosum; print(callosum.__version__)" | tee version.txt
         uv build
     - name: Upload the build version
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: version
         path: version.txt
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: distributions
         path: dist
@@ -164,19 +164,19 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Download the build version
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: version
         path: .
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: distributions
         path: dist
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
     - name: Set up Python
       run: uv python install 3.11
     - name: Extract the release changelog

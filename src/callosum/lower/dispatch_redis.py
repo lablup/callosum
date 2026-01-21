@@ -4,7 +4,6 @@ import asyncio
 from typing import Any, AsyncGenerator, Mapping, Optional, Tuple, Union
 
 import attrs
-import redis
 import redis.asyncio
 
 from ..abc import RawHeaderBody
