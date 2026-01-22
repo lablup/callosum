@@ -136,7 +136,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.6.0" },
     { name = "rich", marker = "extra == 'benchmark'", specifier = ">=13.9.0" },
     { name = "scipy", marker = "extra == 'benchmark'", specifier = ">=1.11.0" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = "~=4.3" },
+    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=4.3,<10.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'" },
     { name = "temporenc", specifier = ">=0.1" },
     { name = "thriftpy2", marker = "extra == 'thrift'", specifier = ">=0.4.20" },
