@@ -3,12 +3,13 @@ CLI interface for Callosum benchmark suite.
 """
 
 import asyncio
+import signal
 from pathlib import Path
 
 import click
 
 from benchmarks.core.config import BenchmarkConfig
-from benchmarks.core.runner import BenchmarkRunner
+from benchmarks.core.runner import BenchmarkInterrupted, BenchmarkRunner
 from benchmarks.reporters.console import ConsoleReporter
 
 
@@ -112,6 +113,15 @@ def main(
     # Run benchmarks
     scenario_filter = None if scenario == "all" else scenario
 
+    # Setup signal handler for graceful shutdown
+    def signal_handler(signum, frame):
+        console.print_warning(
+            "Received interrupt signal, stopping after current scenario..."
+        )
+        runner.interrupt()
+
+    original_sigint = signal.signal(signal.SIGINT, signal_handler)
+
     try:
         asyncio.run(runner.run_all(scenario_filter=scenario_filter))
 
@@ -119,14 +129,58 @@ def main(
         runner.save_results(output_dir=output_dir, format=format)
 
         console.console.print()
-        console.console.print("[green]✓[/green] Benchmarks completed successfully!")
+        if runner.get_failed_scenarios():
+            console.console.print(
+                f"[yellow]⚠[/yellow] Benchmarks completed with "
+                f"{len(runner.get_failed_scenarios())} failed scenario(s)."
+            )
+        else:
+            console.console.print(
+                "[green]✓[/green] Benchmarks completed successfully!"
+            )
         console.console.print(f"Results saved to: {output_dir}")
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, BenchmarkInterrupted):
+        console.console.print()
         console.print_warning("Benchmark interrupted by user")
+
+        # Show and save partial results
+        if runner.get_partial_results():
+            console.console.print()
+            runner.show_partial_report(reason="interrupted")
+
+            # Save partial results
+            try:
+                runner.save_results(output_dir=output_dir, format=format)
+                console.console.print()
+                console.print_info(f"Partial results saved to: {output_dir}")
+            except Exception as save_error:
+                console.print_error(f"Failed to save partial results: {save_error}")
+        else:
+            console.print_info("No results collected before interruption.")
+
     except Exception as e:
+        console.console.print()
         console.print_error(f"Benchmark failed: {e}")
+
+        # Show and save partial results
+        if runner.get_partial_results():
+            console.console.print()
+            runner.show_partial_report(reason="error")
+
+            # Save partial results
+            try:
+                runner.save_results(output_dir=output_dir, format=format)
+                console.console.print()
+                console.print_info(f"Partial results saved to: {output_dir}")
+            except Exception as save_error:
+                console.print_error(f"Failed to save partial results: {save_error}")
+
         raise
+
+    finally:
+        # Restore original signal handler
+        signal.signal(signal.SIGINT, original_sigint)
 
 
 if __name__ == "__main__":

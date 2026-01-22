@@ -53,10 +53,10 @@ class DummyServerAuthenticator(AbstractServerAuthenticator):
         """Check if the given client credential is valid."""
         if self.allowed_public_keys is None:
             # Accept all clients
-            return AuthResult(success=True)
+            return AuthResult(success=True, user_id="benchmark-client")
 
         if creds.public_key in self.allowed_public_keys:
-            return AuthResult(success=True)
+            return AuthResult(success=True, user_id="benchmark-client")
 
         return AuthResult(success=False)
 

@@ -3,6 +3,7 @@ Main benchmark runner orchestration.
 """
 
 import time
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
@@ -29,6 +30,12 @@ from benchmarks.scenarios.throughput import (
 )
 
 
+class BenchmarkInterrupted(Exception):
+    """Raised when benchmark is interrupted by user or signal."""
+
+    pass
+
+
 class BenchmarkRunner:
     """
     Main orchestrator for running benchmark suites.
@@ -52,6 +59,9 @@ class BenchmarkRunner:
         self.console = console_reporter or ConsoleReporter()
         self.enable_profiling = enable_profiling and config.profiling.enabled
         self.all_results: List[BenchmarkResult] = []
+        self.failed_scenarios: List[dict] = []
+        self._interrupted = False
+        self._start_time: Optional[float] = None
 
     def _create_profiler(self) -> Optional[BenchmarkProfiler]:
         """Create profiler if enabled."""
@@ -62,6 +72,45 @@ class BenchmarkRunner:
             profile_cpu=self.config.profiling.profile_cpu,
             profile_memory=self.config.profiling.profile_memory,
         )
+
+    def _check_interrupted(self) -> None:
+        """Check if the benchmark has been interrupted."""
+        if self._interrupted:
+            raise BenchmarkInterrupted("Benchmark interrupted by user")
+
+    async def _run_single_scenario(
+        self,
+        scenario_name: str,
+        run_func,
+        **kwargs,
+    ) -> Optional[BenchmarkResult]:
+        """
+        Run a single scenario with error handling.
+
+        Args:
+            scenario_name: Name for logging
+            run_func: Async function to run
+            **kwargs: Arguments to pass to run_func
+
+        Returns:
+            BenchmarkResult if successful, None if failed
+        """
+        self._check_interrupted()
+        try:
+            result = await run_func(**kwargs)
+            self.all_results.append(result)
+            return result
+        except BenchmarkInterrupted:
+            raise
+        except Exception as e:
+            error_info = {
+                "scenario": scenario_name,
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            }
+            self.failed_scenarios.append(error_info)
+            self.console.print_error(f"Scenario '{scenario_name}' failed: {e}")
+            return None
 
     async def run_throughput_benchmarks(self) -> List[BenchmarkResult]:
         """Run all throughput benchmarks."""
@@ -81,11 +130,14 @@ class BenchmarkRunner:
                 self.console.print_info(
                     f"  Testing payload={payload_size}B, scheduler={scheduler_name}"
                 )
-                result = await payload_scenario.run(
+                result = await self._run_single_scenario(
+                    f"throughput-payload-{payload_size}B-{scheduler_name}",
+                    payload_scenario.run,
                     payload_size=payload_size,
                     scheduler_type=scheduler_type,
                 )
-                results.append(result)
+                if result:
+                    results.append(result)
 
         # Throughput by client count
         client_scenario = ThroughputByClientCount(
@@ -99,11 +151,14 @@ class BenchmarkRunner:
                 self.console.print_info(
                     f"  Testing clients={num_clients}, scheduler={scheduler_name}"
                 )
-                result = await client_scenario.run(
+                result = await self._run_single_scenario(
+                    f"throughput-clients-{num_clients}-{scheduler_name}",
+                    client_scenario.run,
                     num_clients=num_clients,
                     scheduler_type=scheduler_type,
                 )
-                results.append(result)
+                if result:
+                    results.append(result)
 
         # Scheduler comparison
         scheduler_scenario = ThroughputSchedulerComparison(
@@ -114,8 +169,13 @@ class BenchmarkRunner:
         for scheduler_name in self.config.server.scheduler_types:
             scheduler_type = SchedulerType(scheduler_name)
             self.console.print_info(f"  Comparing scheduler={scheduler_name}")
-            result = await scheduler_scenario.run(scheduler_type=scheduler_type)
-            results.append(result)
+            result = await self._run_single_scenario(
+                f"throughput-scheduler-{scheduler_name}",
+                scheduler_scenario.run,
+                scheduler_type=scheduler_type,
+            )
+            if result:
+                results.append(result)
 
         return results
 
@@ -133,8 +193,13 @@ class BenchmarkRunner:
 
         for target_load in self.config.latency.target_loads:
             self.console.print_info(f"  Testing load={target_load} req/s")
-            result = await load_scenario.run(target_load=target_load)
-            results.append(result)
+            result = await self._run_single_scenario(
+                f"latency-load-{target_load}",
+                load_scenario.run,
+                target_load=target_load,
+            )
+            if result:
+                results.append(result)
 
         # Latency by payload size
         payload_scenario = LatencyByPayloadSize(
@@ -144,8 +209,13 @@ class BenchmarkRunner:
 
         for payload_size in self.config.latency.payload_sizes_test:
             self.console.print_info(f"  Testing payload={payload_size}B")
-            result = await payload_scenario.run(payload_size=payload_size)
-            results.append(result)
+            result = await self._run_single_scenario(
+                f"latency-payload-{payload_size}B",
+                payload_scenario.run,
+                payload_size=payload_size,
+            )
+            if result:
+                results.append(result)
 
         # Tail latency analysis
         tail_scenario = TailLatencyAnalysis(
@@ -154,8 +224,12 @@ class BenchmarkRunner:
         )
 
         self.console.print_info("  Running tail latency analysis...")
-        result = await tail_scenario.run()
-        results.append(result)
+        result = await self._run_single_scenario(
+            "latency-tail-analysis",
+            tail_scenario.run,
+        )
+        if result:
+            results.append(result)
 
         return results
 
@@ -176,11 +250,14 @@ class BenchmarkRunner:
                 self.console.print_info(
                     f"  Testing compression={compress}, payload={payload_size}B"
                 )
-                result = await compression_scenario.run(
+                result = await self._run_single_scenario(
+                    f"compression-{payload_size}B-{'on' if compress else 'off'}",
+                    compression_scenario.run,
                     payload_size=payload_size,
                     compress=compress,
                 )
-                results.append(result)
+                if result:
+                    results.append(result)
 
         # Authentication overhead
         auth_scenario = AuthenticationOverhead(
@@ -190,8 +267,13 @@ class BenchmarkRunner:
 
         for use_auth in [False, True]:
             self.console.print_info(f"  Testing authentication={use_auth}")
-            result = await auth_scenario.run(use_auth=use_auth)
-            results.append(result)
+            result = await self._run_single_scenario(
+                f"authentication-{'on' if use_auth else 'off'}",
+                auth_scenario.run,
+                use_auth=use_auth,
+            )
+            if result:
+                results.append(result)
 
         # Combined features matrix
         combined_scenario = CombinedFeaturesMatrix(
@@ -204,13 +286,56 @@ class BenchmarkRunner:
                 self.console.print_info(
                     f"  Testing compression={compress}, auth={use_auth}"
                 )
-                result = await combined_scenario.run(
+                result = await self._run_single_scenario(
+                    f"combined-compress={'on' if compress else 'off'}-auth={'on' if use_auth else 'off'}",
+                    combined_scenario.run,
                     compress=compress,
                     use_auth=use_auth,
                 )
-                results.append(result)
+                if result:
+                    results.append(result)
 
         return results
+
+    def interrupt(self) -> None:
+        """Signal the runner to stop after the current scenario."""
+        self._interrupted = True
+
+    def get_partial_results(self) -> List[BenchmarkResult]:
+        """Get results collected so far (useful after interruption)."""
+        return self.all_results
+
+    def get_failed_scenarios(self) -> List[dict]:
+        """Get list of failed scenarios with error information."""
+        return self.failed_scenarios
+
+    def show_partial_report(self, reason: str = "interrupted") -> None:
+        """
+        Display a report for partial results.
+
+        Args:
+            reason: Reason for partial report ('interrupted' or 'error')
+        """
+        total_duration = time.time() - (self._start_time or time.time())
+
+        if self.all_results:
+            title = f"Partial Benchmark Results ({reason})"
+            self.console.show_results_table(self.all_results, title=title)
+
+        self.console.show_summary(
+            total_scenarios=len(self.all_results),
+            total_duration=total_duration,
+            failed_scenarios=len(self.failed_scenarios),
+        )
+
+        # Show failed scenarios if any
+        if self.failed_scenarios:
+            self.console.console.print()
+            self.console.console.print("[bold red]Failed Scenarios:[/bold red]")
+            for failed in self.failed_scenarios:
+                self.console.console.print(
+                    f"  - {failed['scenario']}: {failed['error']}"
+                )
 
     async def run_all(
         self, scenario_filter: Optional[str] = None
@@ -223,36 +348,45 @@ class BenchmarkRunner:
 
         Returns:
             List of all benchmark results
+
+        Raises:
+            BenchmarkInterrupted: If interrupted by user signal
         """
         self.console.show_header("Callosum RPC Benchmark Suite")
 
-        start_time = time.time()
-        all_results = []
+        self._start_time = time.time()
+        self._interrupted = False
+        self.all_results = []
+        self.failed_scenarios = []
 
-        # Run selected scenarios
-        if scenario_filter is None or scenario_filter == "throughput":
-            results = await self.run_throughput_benchmarks()
-            all_results.extend(results)
+        try:
+            # Run selected scenarios
+            if scenario_filter is None or scenario_filter == "throughput":
+                await self.run_throughput_benchmarks()
 
-        if scenario_filter is None or scenario_filter == "latency":
-            results = await self.run_latency_benchmarks()
-            all_results.extend(results)
+            if scenario_filter is None or scenario_filter == "latency":
+                await self.run_latency_benchmarks()
 
-        if scenario_filter is None or scenario_filter == "features":
-            results = await self.run_feature_benchmarks()
-            all_results.extend(results)
+            if scenario_filter is None or scenario_filter == "features":
+                await self.run_feature_benchmarks()
 
-        total_duration = time.time() - start_time
+        except BenchmarkInterrupted:
+            # Re-raise to be handled by CLI
+            raise
+
+        total_duration = time.time() - self._start_time
 
         # Display results
-        self.console.show_results_table(all_results, title="All Benchmark Results")
+        self.console.show_results_table(
+            self.all_results, title="All Benchmark Results"
+        )
         self.console.show_summary(
-            total_scenarios=len(all_results),
+            total_scenarios=len(self.all_results),
             total_duration=total_duration,
+            failed_scenarios=len(self.failed_scenarios),
         )
 
-        self.all_results = all_results
-        return all_results
+        return self.all_results
 
     def save_results(
         self,
