@@ -482,6 +482,7 @@ class ZeroMQBaseTransport(BaseTransport):
 
     __slots__ = BaseTransport.__slots__ + (
         "_zctx",
+        "_external_zctx",
         "_zsock_opts",
         "_zap_server",
         "_zap_task",
@@ -501,7 +502,9 @@ class ZeroMQBaseTransport(BaseTransport):
         super().__init__(authenticator, **kwargs)
         self._zap_server = None
         self._zap_task = None
-        self._zctx = zmq.asyncio.Context()
+        # Support external context injection via transport_opts["zctx"]
+        self._external_zctx = self.transport_opts.get("zctx") is not None
+        self._zctx = self.transport_opts.get("zctx") or zmq.asyncio.Context()
         match self.authenticator:
             case AbstractServerAuthenticator() as auth:
                 self._zap_server = ZAPServer(self._zctx, auth)
@@ -524,7 +527,8 @@ class ZeroMQBaseTransport(BaseTransport):
             self._zap_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._zap_task
-        if self._zctx is not None:
+        # Do not destroy externally injected context
+        if self._zctx is not None and not self._external_zctx:
             self._zctx.destroy(linger=50)
 
 
