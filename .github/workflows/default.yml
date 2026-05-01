@@ -82,7 +82,7 @@ jobs:
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
       run: uv run python -m pytest --cov tests
     - name: Upload coverage report
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
 
   test-integration:
 
