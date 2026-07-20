@@ -180,10 +180,18 @@ class Peer(AbstractChannel):
                         )
                         func_tasks.add(task)
                         task.add_done_callback(func_tasks.discard)
+                        # Bind the key as a default argument: the callback runs
+                        # after the loop has rebound `request` and
+                        # `client_request_id` to a newer message, so a plain
+                        # closure would pop the newest entry instead of its own,
+                        # leaking this entry forever and breaking CANCEL for the
+                        # newest request.
                         task.add_done_callback(
-                            lambda task: self._req_idmap.pop(
-                                (request.peer_id, client_request_id),
-                                None,
+                            lambda task, key=(request.peer_id, client_request_id): (
+                                self._req_idmap.pop(
+                                    key,
+                                    None,
+                                )
                             )
                         )
                         await asyncio.sleep(0)
