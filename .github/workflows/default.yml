@@ -184,7 +184,7 @@ jobs:
         uv run python ./scripts/extract-release-changelog.py
         uv run python ./scripts/determine-release-type.py
     - name: Publish to GitHub
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
