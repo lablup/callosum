@@ -389,3 +389,66 @@ async def test_internal_context_destroyed_on_close() -> None:
     # Verify context IS destroyed after transport close
     assert server_zctx.closed
     assert client_zctx.closed
+
+
+@pytest.mark.asyncio
+async def test_req_idmap_emptied_after_overlapping_calls() -> None:
+    """
+    Regression test for the done-callback closure bug: the callback captured
+    the receive-loop variables by reference, so a function task that finished
+    after a newer request had arrived popped the newer request's entry from
+    ``_req_idmap`` instead of its own, stranding its own entry forever (and
+    silently disabling CANCEL for the newer request).
+    """
+    done = asyncio.Event()
+    first_may_return = asyncio.Event()
+
+    async def func(request: RPCMessage) -> int:
+        body = cast(Mapping[str, int], request.body)
+        if body["idx"] == 0:
+            # Keep the first call in flight until the second call completes,
+            # so the first task's done-callback runs only after the receive
+            # loop has moved on to the newer request.
+            await first_may_return.wait()
+        else:
+            first_may_return.set()
+        return body["idx"]
+
+    server = Peer(
+        bind=ZeroMQAddress("tcp://127.0.0.1:5021"),
+        transport=ZeroMQRPCTransport,
+        scheduler=ExitOrderedAsyncScheduler(),
+        serializer=lambda o: json.dumps(o).encode("utf8"),
+        deserializer=lambda b: json.loads(b),
+    )
+    server.handle_function("func", func)
+
+    async def serve() -> None:
+        async with server:
+            await done.wait()
+
+    async def request() -> None:
+        client = Peer(
+            connect=ZeroMQAddress("tcp://localhost:5021"),
+            transport=ZeroMQRPCTransport,
+            serializer=lambda o: json.dumps(o).encode("utf8"),
+            deserializer=lambda b: json.loads(b),
+        )
+        async with client:
+            first = asyncio.create_task(
+                client.invoke("func", {"idx": 0}, order_key="k0")
+            )
+            # Make sure the first request is received and its task is waiting
+            # before the second request rebinds the receive-loop variables.
+            await asyncio.sleep(0.2)
+            second = asyncio.create_task(
+                client.invoke("func", {"idx": 1}, order_key="k1")
+            )
+            results = await asyncio.gather(first, second)
+            assert sorted(cast(List[int], results)) == [0, 1]
+        done.set()
+
+    server_task = asyncio.create_task(serve())
+    client_task = asyncio.create_task(request())
+    await asyncio.gather(server_task, client_task)
+    assert server._req_idmap == {}
