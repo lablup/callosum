@@ -17,8 +17,6 @@ from typing import (
     Union,
 )
 
-import attrs
-
 from ..abc import (
     AbstractChannel,
     AbstractDeserializer,
@@ -383,9 +381,9 @@ class Peer(AbstractChannel):
                 server_cancelled = True
                 raise asyncio.CancelledError
             elif response.msgtype == RPCMessageTypes.FAILURE:
-                raise RPCUserError(*attrs.astuple(response.metadata))
+                raise RPCUserError.from_err_metadata(response.metadata)
             elif response.msgtype == RPCMessageTypes.ERROR:
-                raise RPCInternalError(*attrs.astuple(response.metadata))
+                raise RPCInternalError.from_err_metadata(response.metadata)
             return upper_result
         except (asyncio.TimeoutError, asyncio.CancelledError):
             # propagate cancellation to the connected peer
